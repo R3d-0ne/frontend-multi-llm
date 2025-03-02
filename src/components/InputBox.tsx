@@ -2,11 +2,17 @@ import {useState} from "react";
 import {Send} from "lucide-react";
 import {Box, IconButton, Paper, TextField} from "@mui/material";
 
-export default function InputBox({onSend}: { onSend: (message: string) => void }) {
+interface InputBoxProps {
+    onSend: (message: string) => void;
+    disabled?: boolean;
+    placeholder?: string;
+}
+
+export default function InputBox({onSend, disabled = false, placeholder = "Tapez votre message..."}: InputBoxProps) {
     const [message, setMessage] = useState("");
 
     const handleSend = () => {
-        if (message.trim()) {
+        if (message.trim() && !disabled) {
             onSend(message);
             setMessage("");
         }
@@ -31,16 +37,18 @@ export default function InputBox({onSend}: { onSend: (message: string) => void }
                     width: "100%",
                     maxWidth: 700,
                     p: 1,
-                    borderRadius: 3
+                    borderRadius: 3,
+                    opacity: disabled ? 0.7 : 1
                 }}
             >
                 <TextField
                     fullWidth
                     variant="outlined"
-                    placeholder="Tapez votre message..."
+                    placeholder={placeholder}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                    onKeyDown={(e) => e.key === "Enter" && !disabled && handleSend()}
+                    disabled={disabled}
                     sx={{
                         mx: 1,
                         "& .MuiOutlinedInput-root": {
@@ -49,7 +57,11 @@ export default function InputBox({onSend}: { onSend: (message: string) => void }
                     }}
                 />
 
-                <IconButton onClick={handleSend} sx={{color: "transparent"}}>
+                <IconButton 
+                    onClick={handleSend} 
+                    sx={{color: "transparent"}}
+                    disabled={disabled || !message.trim()}
+                >
                     <Send size={24}/>
                 </IconButton>
             </Paper>
