@@ -23,6 +23,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import SettingsIcon from "@mui/icons-material/Settings";
 import {fetchDiscussions, deleteDiscussion} from "../services/discussions_services";
 import NewDiscussionButton from "./NewDiscussionButton";
 
@@ -39,7 +40,7 @@ interface Discussion {
 
 export default function SideBar({onSelectConversation, modelName}: {
     onSelectConversation: (id: string) => void;
-    modelName: string
+    modelName: string;
 }) {
     const theme = useTheme();
     const [open, setOpen] = useState(false);
@@ -148,6 +149,10 @@ export default function SideBar({onSelectConversation, modelName}: {
         onSelectConversation(id);
     };
 
+    const handleSettingsClick = () => {
+        console.log("Bouton paramètres cliqué");
+    };
+
     return (
         <>
             {/* Barre d'application fixe avec un style moderne */}
@@ -185,6 +190,20 @@ export default function SideBar({onSelectConversation, modelName}: {
                     >
                         {modelName}
                     </Typography>
+                    <Tooltip title="Paramètres">
+                        <IconButton
+                            color="inherit"
+                            onClick={handleSettingsClick}
+                            sx={{
+                                borderRadius: 1.5,
+                                '&:hover': {
+                                    bgcolor: alpha(theme.palette.primary.main, 0.08)
+                                }
+                            }}
+                        >
+                            <SettingsIcon />
+                        </IconButton>
+                    </Tooltip>
                 </Toolbar>
             </AppBar>
 

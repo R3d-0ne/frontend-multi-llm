@@ -1,11 +1,16 @@
 import {useState, useEffect} from "react";
-import {Box, Button, Collapse, Grid, MenuItem, TextField, Typography, IconButton, Tooltip} from "@mui/material";
+import {Box, Button, Collapse, Grid, MenuItem, TextField, Typography, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions} from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import MemoryIcon from "@mui/icons-material/Memory";
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"; // Icône du bouton Valider
+import AddIcon from '@mui/icons-material/Add';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import { createSettings, Settings } from "../services/settings_service";
+import { List, ListItem, ListItemText } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 
 interface SettingsPanelProps {
     settings: any[];
@@ -15,6 +20,7 @@ interface SettingsPanelProps {
     selectedSettingId?: string | null;
     collapsed?: boolean;
     onCollapse?: (collapsed: boolean) => void;
+    onSettingsUpdated?: () => void;
 }
 
 export default function SettingsPanel({
@@ -24,7 +30,8 @@ export default function SettingsPanel({
     onSettingChange,
     selectedSettingId,
     collapsed = false,
-    onCollapse
+    onCollapse,
+    onSettingsUpdated
 }: SettingsPanelProps) {
     const [selectedTab, setSelectedTab] = useState<string | null>(null);
     const [selectedValues, setSelectedValues] = useState({
@@ -32,6 +39,12 @@ export default function SettingsPanel({
         model: "",
         mode: "",
     });
+    const [newSettingDialogOpen, setNewSettingDialogOpen] = useState(false);
+    const [newSetting, setNewSetting] = useState<Settings>({
+        title: '',
+        content: ''
+    });
+    const theme = useTheme();
 
     // Mettre à jour la valeur sélectionnée lorsque selectedSettingId change
     useEffect(() => {
@@ -64,11 +77,30 @@ export default function SettingsPanel({
         }
     };
 
+    const handleListItemClick = (settingId: string) => {
+        // Uniquement mettre à jour la sélection dans le state local
+        setSelectedValues(prev => ({...prev, settings: settingId}));
+    };
+
     const handleValidate = () => {
-        console.log("Requête à construire:", selectedValues);
-        // Si onSettingChange est défini et qu'une valeur est sélectionnée, appeler la fonction
-        if (onSettingChange && selectedValues.settings) {
-            onSettingChange(selectedValues.settings);
+        // Appliquer le setting sélectionné à la discussion
+        const settingToApply = selectedValues.settings;
+        if (settingToApply && onSettingChange) {
+            // On envoie l'ID du setting pour que le backend puisse le récupérer
+            onSettingChange(settingToApply);
+        }
+    };
+
+    const handleCreateSetting = async () => {
+        try {
+            await createSettings(newSetting);
+            setNewSettingDialogOpen(false);
+            setNewSetting({ title: '', content: '' });
+            if (onSettingsUpdated) {
+                onSettingsUpdated();
+            }
+        } catch (error) {
+            console.error("Erreur lors de la création des paramètres:", error);
         }
     };
 
@@ -111,20 +143,27 @@ export default function SettingsPanel({
             {/* Bouton pour replier le panneau - position fixe en haut */}
             <Box sx={{ 
                 position: 'fixed', 
-                right: 0, 
+                right: collapsed ? '10px' : '300px', 
                 top: '80px', 
                 zIndex: 1000,
-                width: 'auto'
+                width: 'auto',
+                transition: 'right 0.3s ease'
             }}>
-                <Tooltip title="Masquer les paramètres">
+                <Tooltip title={collapsed ? "Afficher les paramètres" : "Masquer les paramètres"}>
                     <IconButton 
                         onClick={toggleCollapse} 
                         size="large"
                         sx={{
                             bgcolor: 'background.paper',
                             boxShadow: 1,
+                            borderRadius: '8px',
+                            '&:hover': {
+                                bgcolor: alpha(theme.palette.primary.main, 0.08)
+                            },
                             '& svg': {
-                                fontSize: '1.8rem'
+                                fontSize: '1.8rem',
+                                transform: collapsed ? 'rotate(180deg)' : 'none',
+                                transition: 'transform 0.3s ease'
                             }
                         }}
                     >
@@ -134,10 +173,21 @@ export default function SettingsPanel({
             </Box>
             
             {/* Contenu du panneau - avec marge en haut pour laisser place au bouton */}
-            <Box sx={{ mt: '60px', width: '100%' }}>
+            <Box sx={{ 
+                mt: '60px', 
+                width: '100%',
+                height: 'calc(100vh - 80px)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
+            }}>
                 {/* Conteneur des boutons principaux */}
-                <Box
-                    sx={{display: "flex", width: "100%", p: 2, bgcolor: "transparent", boxShadow: "none", borderRadius: 0}}>
+                <Box sx={{
+                    p: 2, 
+                    bgcolor: "transparent", 
+                    boxShadow: "none", 
+                    borderRadius: 0
+                }}>
                     <Grid container spacing={2} direction="column" justifyContent="center" width={"100%"}>
                         {[
                             {label: "Paramètres", icon: <SettingsIcon fontSize="large" />, value: "settings"},
@@ -170,170 +220,266 @@ export default function SettingsPanel({
                     </Grid>
                 </Box>
 
-                {/* Panneau Settings */}
-                <Collapse in={selectedTab === "settings"} sx={{width: "100%", mt: 2}}>
-                    <Box sx={{p: 2, bgcolor: "background.paper", borderRadius: 2, boxShadow: 1}}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="subtitle1" fontWeight="bold">
-                                Paramètres
+                {/* Zone de contenu principal */}
+                <Box sx={{ mt: 2 }}>
+                    {/* Récapitulatif - affiché quand aucun panneau n'est sélectionné */}
+                    <Collapse in={!selectedTab}>
+                        <Box sx={{ 
+                            p: 2, 
+                            bgcolor: 'background.paper',
+                            borderRadius: 1,
+                            boxShadow: 1
+                        }}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                                Sélections actuelles :
                             </Typography>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                size="small"
-                                startIcon={<CheckCircleOutlineIcon/>}
-                                onClick={handleValidate}
-                                sx={{
-                                    borderRadius: 2,
-                                    py: 0.8,
-                                    fontWeight: 'bold',
-                                    boxShadow: 1
-                                }}
-                            >
-                                Valider
-                            </Button>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                    <SettingsIcon fontSize="small" color="action" />
+                                    <Typography variant="body2">
+                                        Paramètre : {selectedValues.settings ? 
+                                            getSettingName(selectedValues.settings) : 
+                                            "Aucun paramètre sélectionné"}
+                                    </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                    <MemoryIcon fontSize="small" color="action" />
+                                    <Typography variant="body2">
+                                        Modèle : {selectedValues.model || "Aucun modèle sélectionné"}
+                                    </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                    <SettingsSuggestIcon fontSize="small" color="action" />
+                                    <Typography variant="body2">
+                                        Mode : {selectedValues.mode || "Aucun mode sélectionné"}
+                                    </Typography>
+                                </Box>
+                            </Box>
                         </Box>
-                        <TextField
-                            select
-                            fullWidth
-                            label="Sélectionner un paramètre"
-                            value={selectedValues.settings}
-                            onChange={handleChange("settings")}
-                            variant="outlined"
-                            margin="normal"
-                            SelectProps={{
-                                MenuProps: {
-                                    PaperProps: {
-                                        sx: {
-                                            maxHeight: 300
-                                        }
-                                    }
-                                }
-                            }}
-                        >
-                            {settings.map((setting) => (
-                                <MenuItem key={setting.id} value={setting.id} sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                                    <Box sx={{ width: '100%' }}>
-                                        <Typography variant="body1" fontWeight="bold" sx={{ wordBreak: 'break-word' }}>
-                                            {setting.payload?.title || "Sans titre"}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, wordBreak: 'break-word' }}>
-                                            {setting.payload?.content 
-                                                ? (setting.payload.content.length > 80 
-                                                    ? setting.payload.content.substring(0, 80) + '...' 
-                                                    : setting.payload.content) 
-                                                : "Aucun contenu"}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
-                                            ID: {setting.id.substring(0, 8)}...
-                                        </Typography>
-                                    </Box>
-                                </MenuItem>
-                            ))}
-                        </TextField>
-                    </Box>
-                </Collapse>
+                    </Collapse>
 
-                {/* Panneau Models */}
-                <Collapse in={selectedTab === "models"} sx={{width: "100%", mt: 2}}>
-                    <Box sx={{p: 2, bgcolor: "background.paper", borderRadius: 2, boxShadow: 1}}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="subtitle1" fontWeight="bold">
-                                Modèles
-                            </Typography>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                size="small"
-                                startIcon={<CheckCircleOutlineIcon/>}
-                                onClick={handleValidate}
-                                sx={{
-                                    borderRadius: 2,
-                                    py: 0.8,
-                                    fontWeight: 'bold',
-                                    boxShadow: 1
-                                }}
-                            >
-                                Valider
-                            </Button>
+                    {/* Panneau Settings */}
+                    <Collapse in={selectedTab === "settings"}>
+                        <Box sx={{ 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            bgcolor: 'background.paper',
+                            borderRadius: 1,
+                            boxShadow: 1,
+                            height: '100%',
+                            mb: 2
+                        }}>
+                            <Box sx={{ 
+                                display: 'flex', 
+                                justifyContent: 'flex-end', 
+                                alignItems: 'center',
+                                p: 1.5,
+                                borderBottom: '1px solid',
+                                borderColor: 'divider',
+                                gap: 1
+                            }}>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={() => setNewSettingDialogOpen(true)}
+                                    startIcon={<AddIcon />}
+                                    size="small"
+                                    sx={{ borderRadius: 1 }}
+                                >
+                                    Nouveau
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={handleValidate}
+                                    disabled={!selectedValues.settings}
+                                    size="small"
+                                    sx={{ borderRadius: 1 }}
+                                >
+                                    Appliquer
+                                </Button>
+                            </Box>
+                            <List sx={{ 
+                                flexGrow: 1, 
+                                overflow: 'auto',
+                                p: 0
+                            }}>
+                                {settings.map((setting) => (
+                                    <ListItem
+                                        component="div"
+                                        key={setting.id}
+                                        onClick={() => handleListItemClick(setting.id)}
+                                        sx={{ 
+                                            cursor: 'pointer',
+                                            py: 0.75,
+                                            px: 2,
+                                            '&:hover': {
+                                                bgcolor: 'action.hover'
+                                            },
+                                            ...(selectedValues.settings === setting.id && {
+                                                bgcolor: 'action.selected',
+                                                borderLeft: '3px solid',
+                                                borderColor: 'primary.main'
+                                            })
+                                        }}
+                                    >
+                                        <ListItemText 
+                                            primary={setting.payload?.title || "Sans titre"}
+                                            secondary={setting.payload?.content || "Aucun contenu"}
+                                            primaryTypographyProps={{
+                                                variant: 'body1',
+                                                sx: { fontWeight: 500 }
+                                            }}
+                                            secondaryTypographyProps={{
+                                                sx: {
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap'
+                                                }
+                                            }}
+                                        />
+                                    </ListItem>
+                                ))}
+                            </List>
                         </Box>
-                        <TextField
-                            select
-                            fullWidth
-                            label="Sélectionner un modèle"
-                            value={selectedValues.model}
-                            onChange={handleChange("model")}
-                            variant="outlined"
-                            margin="normal"
-                            SelectProps={{
-                                MenuProps: {
-                                    PaperProps: {
-                                        sx: {
-                                            maxHeight: 300
-                                        }
-                                    }
-                                }
-                            }}
-                        >
-                            {models.map((option, index) => (
-                                <MenuItem key={index} value={option} sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                                    <Typography variant="body1">{option}</Typography>
-                                </MenuItem>
-                            ))}
-                        </TextField>
-                    </Box>
-                </Collapse>
+                    </Collapse>
 
-                {/* Panneau Mode */}
-                <Collapse in={selectedTab === "mode"} sx={{width: "100%", mt: 2}}>
-                    <Box sx={{p: 2, bgcolor: "background.paper", borderRadius: 2, boxShadow: 1}}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="subtitle1" fontWeight="bold">
-                                Mode
-                            </Typography>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                size="small"
-                                startIcon={<CheckCircleOutlineIcon/>}
-                                onClick={handleValidate}
-                                sx={{
-                                    borderRadius: 2,
-                                    py: 0.8,
-                                    fontWeight: 'bold',
-                                    boxShadow: 1
-                                }}
-                            >
-                                Valider
-                            </Button>
-                        </Box>
-                        <TextField
-                            select
-                            fullWidth
-                            label="Sélectionner un mode"
-                            value={selectedValues.mode}
-                            onChange={handleChange("mode")}
-                            variant="outlined"
-                            margin="normal"
-                            SelectProps={{
-                                MenuProps: {
-                                    PaperProps: {
-                                        sx: {
-                                            maxHeight: 300
+                    {/* Panneau Models */}
+                    <Collapse in={selectedTab === "models"}>
+                        <Box sx={{p: 2, bgcolor: "background.paper", borderRadius: 2, boxShadow: 1, mb: 2}}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="subtitle1" fontWeight="bold">
+                                    Modèles
+                                </Typography>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    size="small"
+                                    startIcon={<CheckCircleOutlineIcon/>}
+                                    onClick={handleValidate}
+                                    sx={{
+                                        borderRadius: 2,
+                                        py: 0.8,
+                                        fontWeight: 'bold',
+                                        boxShadow: 1
+                                    }}
+                                >
+                                    Valider
+                                </Button>
+                            </Box>
+                            <TextField
+                                select
+                                fullWidth
+                                label="Sélectionner un modèle"
+                                value={selectedValues.model}
+                                onChange={handleChange("model")}
+                                variant="outlined"
+                                margin="normal"
+                                SelectProps={{
+                                    MenuProps: {
+                                        PaperProps: {
+                                            sx: {
+                                                maxHeight: 300
+                                            }
                                         }
                                     }
-                                }
-                            }}
-                        >
-                            {modes.map((option, index) => (
-                                <MenuItem key={index} value={option} sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                                    <Typography variant="body1">{option}</Typography>
-                                </MenuItem>
-                            ))}
-                        </TextField>
-                    </Box>
-                </Collapse>
+                                }}
+                            >
+                                {models.map((option, index) => (
+                                    <MenuItem key={index} value={option} sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <Typography variant="body1">{option}</Typography>
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        </Box>
+                    </Collapse>
+
+                    {/* Panneau Mode */}
+                    <Collapse in={selectedTab === "mode"}>
+                        <Box sx={{p: 2, bgcolor: "background.paper", borderRadius: 2, boxShadow: 1, mb: 2}}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="subtitle1" fontWeight="bold">
+                                    Mode
+                                </Typography>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    size="small"
+                                    startIcon={<CheckCircleOutlineIcon/>}
+                                    onClick={handleValidate}
+                                    sx={{
+                                        borderRadius: 2,
+                                        py: 0.8,
+                                        fontWeight: 'bold',
+                                        boxShadow: 1
+                                    }}
+                                >
+                                    Valider
+                                </Button>
+                            </Box>
+                            <TextField
+                                select
+                                fullWidth
+                                label="Sélectionner un mode"
+                                value={selectedValues.mode}
+                                onChange={handleChange("mode")}
+                                variant="outlined"
+                                margin="normal"
+                                SelectProps={{
+                                    MenuProps: {
+                                        PaperProps: {
+                                            sx: {
+                                                maxHeight: 300
+                                            }
+                                        }
+                                    }
+                                }}
+                            >
+                                {modes.map((option, index) => (
+                                    <MenuItem key={index} value={option} sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <Typography variant="body1">{option}</Typography>
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        </Box>
+                    </Collapse>
+                </Box>
             </Box>
+
+            {/* Dialog pour créer un nouveau paramètre */}
+            <Dialog 
+                open={newSettingDialogOpen} 
+                onClose={() => setNewSettingDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Nouveau paramètre</DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Titre"
+                        fullWidth
+                        value={newSetting.title}
+                        onChange={(e) => setNewSetting({ ...newSetting, title: e.target.value })}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Contenu"
+                        fullWidth
+                        multiline
+                        rows={4}
+                        value={newSetting.content}
+                        onChange={(e) => setNewSetting({ ...newSetting, content: e.target.value })}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setNewSettingDialogOpen(false)}>Annuler</Button>
+                    <Button onClick={handleCreateSetting} variant="contained" color="primary">
+                        Créer
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </>
     );
 }

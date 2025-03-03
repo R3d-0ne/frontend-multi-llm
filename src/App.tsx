@@ -27,32 +27,39 @@ const App = () => {
   const [currentDiscussionId, setCurrentDiscussionId] = useState<string | null>(null);
   const [settings, setSettings] = useState<any[]>([]);
   const [selectedSettingId, setSelectedSettingId] = useState<string | null>(null);
-  const [settingsPanelCollapsed, setSettingsPanelCollapsed] = useState<boolean>(false);
+  const [settingsPanelCollapsed, setSettingsPanelCollapsed] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Fonction pour charger les paramètres
+  const loadSettings = async () => {
+    try {
+      console.log("Chargement des paramètres...");
+      const settingsData = await getSettings();
+      console.log("Paramètres chargés:", settingsData);
+      setSettings(settingsData);
+      if (settingsData.length > 0) {
+        setSelectedSettingId(settingsData[0].id);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des paramètres:", error);
+      setError("Erreur lors du chargement des paramètres");
+    }
+  };
+
+  // Fonction pour gérer le changement de paramètres
+  const handleSettingChange = (settingId: string) => {
+    console.log("Changement de paramètre:", settingId);
+    setSelectedSettingId(settingId);
+  };
 
   // Fonction pour gérer l'état du panneau de paramètres
   const handleSettingsPanelCollapse = (collapsed: boolean) => {
     setSettingsPanelCollapsed(collapsed);
   };
 
-  // Charger les paramètres disponibles
+  // Charger les paramètres au démarrage
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        console.log("Chargement des paramètres...");
-        const settingsData = await getSettings();
-        console.log("Paramètres chargés:", settingsData);
-        setSettings(settingsData);
-        if (settingsData.length > 0) {
-          setSelectedSettingId(settingsData[0].id);
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des paramètres:", error);
-        setError("Erreur lors du chargement des paramètres");
-      }
-    };
-    
     loadSettings();
   }, []);
 
@@ -98,6 +105,12 @@ const App = () => {
       return;
     }
     
+    console.log("Envoi du message avec les paramètres suivants:", {
+      discussionId: currentDiscussionId,
+      message,
+      selectedSettingId
+    });
+    
     // Ajouter le message de l'utilisateur à l'interface
     const userMessage = { 
       text: message, 
@@ -110,15 +123,14 @@ const App = () => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log(`Envoi du message dans la discussion ${currentDiscussionId}:`, message);
       // Continuer une discussion existante
       const response = await continueDiscussion(
         currentDiscussionId, 
-        message, 
-        undefined, 
-        selectedSettingId || undefined
+        message,
+        undefined, // additionalInfo
+        selectedSettingId || undefined // settingsId
       );
-      console.log("Réponse reçue:", response);
+      console.log("Réponse reçue avec le contexte:", response);
       
       // Ajouter la réponse de l'assistant à l'interface
       const assistantMessage = { 
@@ -139,11 +151,6 @@ const App = () => {
   const handleSelectConversation = (id: string) => {
     console.log(`Sélection de la discussion: ${id}`);
     setCurrentDiscussionId(id);
-  };
-
-  const handleSettingChange = (settingId: string) => {
-    console.log(`Changement de paramètre: ${settingId}`);
-    setSelectedSettingId(settingId);
   };
 
   const handleCloseError = () => {
@@ -180,12 +187,12 @@ const App = () => {
               top: 0,
               bottom: 0,
               transform: "translateX(-50%)",
-              width: "700px", // Largeur fixe
+              width: "700px",
               height: "100%",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
-              padding: "60px 0 20px 0" // Espace en haut et en bas
+              padding: "60px 0 20px 0"
             }}
           >
             {/* Zone de chat (prend tout l'espace disponible) */}
@@ -203,29 +210,30 @@ const App = () => {
             </Box>
           </Box>
 
-          {/* Panneau de paramètres (position absolue) */}
-          <Box 
-            sx={{ 
-              position: "absolute",
+          {/* Panneau de paramètres */}
+          <Box
+            sx={{
+              position: "fixed",
               right: 0,
               top: 0,
-              height: "100%",
-              width: settingsPanelCollapsed ? "60px" : "300px",
-              transition: "width 0.3s ease-in-out",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              zIndex: 10
+              height: "100vh",
+              width: settingsPanelCollapsed ? "auto" : "300px",
+              bgcolor: "background.paper",
+              borderLeft: 1,
+              borderColor: "divider",
+              transition: "width 0.3s ease",
+              zIndex: 1000,
             }}
           >
             <SettingsPanel
               settings={settings}
-              models={["GPT-4", "DeepSeek"]}
-              modes={["Standard", "Avancé"]}
+              models={[]}
+              modes={[]}
               onSettingChange={handleSettingChange}
               selectedSettingId={selectedSettingId}
               collapsed={settingsPanelCollapsed}
               onCollapse={handleSettingsPanelCollapse}
+              onSettingsUpdated={loadSettings}
             />
           </Box>
         </Box>

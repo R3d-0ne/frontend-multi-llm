@@ -1,9 +1,10 @@
 const API_BASE_URL = "http://localhost:8000"; // URL du backend Docker
 
 // Interface pour les paramètres
-interface Settings {
-  name: string;
+export interface Settings {
+  title: string;
   content: string;
+  updated_at?: string;
   model?: string;
   temperature?: number;
   max_tokens?: number;
