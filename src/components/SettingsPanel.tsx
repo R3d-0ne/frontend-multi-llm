@@ -2,7 +2,7 @@ import {useState, useEffect} from "react";
 import {Box, Button, Collapse, Grid, MenuItem, TextField, Typography, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions} from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import MemoryIcon from "@mui/icons-material/Memory";
-import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"; // Icône du bouton Valider
 import AddIcon from '@mui/icons-material/Add';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
@@ -11,6 +11,7 @@ import { createSettings, Settings } from "../services/settings_service";
 import { List, ListItem, ListItemText } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
+import DocumentUpload from "./DocumentUpload";
 
 interface SettingsPanelProps {
     settings: any[];
@@ -37,9 +38,9 @@ export default function SettingsPanel({
     const [selectedValues, setSelectedValues] = useState({
         settings: "",
         model: "",
-        mode: "",
     });
     const [newSettingDialogOpen, setNewSettingDialogOpen] = useState(false);
+    const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
     const [newSetting, setNewSetting] = useState<Settings>({
         title: '',
         content: ''
@@ -192,13 +193,19 @@ export default function SettingsPanel({
                         {[
                             {label: "Paramètres", icon: <SettingsIcon fontSize="large" />, value: "settings"},
                             {label: "Modèles", icon: <MemoryIcon fontSize="large" />, value: "models"},
-                            {label: "Mode", icon: <SettingsSuggestIcon fontSize="large" />, value: "mode"},
+                            {label: "Déposer des Documents", icon: <UploadFileIcon fontSize="large" />, value: "upload"},
                         ].map((item) => (
                             <Grid item key={item.value}>
                                 <Button
                                     fullWidth
                                     variant={selectedTab === item.value ? "contained" : "outlined"}
-                                    onClick={() => togglePanel(item.value)}
+                                    onClick={() => {
+                                        if (item.value === "upload") {
+                                            setUploadDialogOpen(true);
+                                        } else {
+                                            togglePanel(item.value);
+                                        }
+                                    }}
                                     sx={{
                                         borderRadius: 2,
                                         py: 1.5,
@@ -246,12 +253,6 @@ export default function SettingsPanel({
                                     <MemoryIcon fontSize="small" color="action" />
                                     <Typography variant="body2">
                                         Modèle : {selectedValues.model || "Aucun modèle sélectionné"}
-                                    </Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                                    <SettingsSuggestIcon fontSize="small" color="action" />
-                                    <Typography variant="body2">
-                                        Mode : {selectedValues.mode || "Aucun mode sélectionné"}
                                     </Typography>
                                 </Box>
                             </Box>
@@ -393,56 +394,6 @@ export default function SettingsPanel({
                             </TextField>
                         </Box>
                     </Collapse>
-
-                    {/* Panneau Mode */}
-                    <Collapse in={selectedTab === "mode"}>
-                        <Box sx={{p: 2, bgcolor: "background.paper", borderRadius: 2, boxShadow: 1, mb: 2}}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                <Typography variant="subtitle1" fontWeight="bold">
-                                    Mode
-                                </Typography>
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    size="small"
-                                    startIcon={<CheckCircleOutlineIcon/>}
-                                    onClick={handleValidate}
-                                    sx={{
-                                        borderRadius: 2,
-                                        py: 0.8,
-                                        fontWeight: 'bold',
-                                        boxShadow: 1
-                                    }}
-                                >
-                                    Valider
-                                </Button>
-                            </Box>
-                            <TextField
-                                select
-                                fullWidth
-                                label="Sélectionner un mode"
-                                value={selectedValues.mode}
-                                onChange={handleChange("mode")}
-                                variant="outlined"
-                                margin="normal"
-                                SelectProps={{
-                                    MenuProps: {
-                                        PaperProps: {
-                                            sx: {
-                                                maxHeight: 300
-                                            }
-                                        }
-                                    }
-                                }}
-                            >
-                                {modes.map((option, index) => (
-                                    <MenuItem key={index} value={option} sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                                        <Typography variant="body1">{option}</Typography>
-                                    </MenuItem>
-                                ))}
-                            </TextField>
-                        </Box>
-                    </Collapse>
                 </Box>
             </Box>
 
@@ -480,6 +431,12 @@ export default function SettingsPanel({
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Dialog pour le dépôt de documents */}
+            <DocumentUpload
+                open={uploadDialogOpen}
+                onClose={() => setUploadDialogOpen(false)}
+            />
         </>
     );
 }
