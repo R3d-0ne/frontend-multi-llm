@@ -38,9 +38,10 @@ interface Discussion {
     [key: string]: any;
 }
 
-export default function SideBar({onSelectConversation, modelName}: {
+export default function SideBar({onSelectConversation, modelName, onNavigateTo}: {
     onSelectConversation: (id: string) => void;
     modelName: string;
+    onNavigateTo?: (page: string) => void;
 }) {
     const theme = useTheme();
     const [open, setOpen] = useState(false);
@@ -153,6 +154,20 @@ export default function SideBar({onSelectConversation, modelName}: {
         console.log("Bouton paramètres cliqué");
     };
 
+    // Fonction pour naviguer vers la page Documents
+    const handleNavigateToDocuments = () => {
+        if (onNavigateTo) {
+            onNavigateTo('documents');
+        }
+    };
+
+    // Fonction pour naviguer vers la page Conversations
+    const handleNavigateToConversations = () => {
+        if (onNavigateTo) {
+            onNavigateTo('chat');
+        }
+    };
+
     return (
         <>
             {/* Barre d'application fixe avec un style moderne */}
@@ -232,7 +247,46 @@ export default function SideBar({onSelectConversation, modelName}: {
                             flexDirection: 'column'
                         }}
                     >
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                        <Box 
+                            sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between', 
+                                mb: 1.5,
+                                p: 1,
+                                borderRadius: 2,
+                                cursor: 'pointer',
+                                '&:hover': {
+                                    bgcolor: alpha(theme.palette.action.hover, 0.1)
+                                }
+                            }}
+                            onClick={handleNavigateToDocuments}
+                        >
+                            <Typography 
+                                variant="h6" 
+                                sx={{ 
+                                    fontWeight: 600,
+                                    letterSpacing: '0.02em'
+                                }}
+                            >
+                                Documents
+                            </Typography>
+                        </Box>
+                        <Box 
+                            sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between', 
+                                mb: 1.5,
+                                p: 1,
+                                borderRadius: 2,
+                                cursor: 'pointer',
+                                '&:hover': {
+                                    bgcolor: alpha(theme.palette.action.hover, 0.1)
+                                }
+                            }}
+                            onClick={handleNavigateToConversations}
+                        >
                             <Typography 
                                 variant="h6" 
                                 sx={{ 
@@ -246,7 +300,7 @@ export default function SideBar({onSelectConversation, modelName}: {
                             <NewDiscussionButton onDiscussionCreated={handleDiscussionCreated} />
                         </Box>
                         
-                        <Divider sx={{ mb: 2, opacity: 0.6 }} />
+                        <Divider sx={{ mb: 1.5, mt: 0.5, opacity: 0.6 }} />
                         
                         {loading && (
                             <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
@@ -322,14 +376,7 @@ export default function SideBar({onSelectConversation, modelName}: {
                                                     <IconButton
                                                         size="small"
                                                         onClick={(e) => handleMenuOpen(e, discussion.id)}
-                                                        sx={{ 
-                                                            ml: 1,
-                                                            color: 'text.secondary',
-                                                            '&:hover': {
-                                                                color: 'text.primary',
-                                                                bgcolor: alpha(theme.palette.action.active, 0.12)
-                                                            }
-                                                        }}
+                                                        sx={{ ml: 1 }}
                                                     >
                                                         <MoreVertIcon fontSize="small" />
                                                     </IconButton>
@@ -346,43 +393,20 @@ export default function SideBar({onSelectConversation, modelName}: {
                                                             horizontal: 'right',
                                                         }}
                                                         PaperProps={{
-                                                            elevation: 3,
                                                             sx: {
                                                                 minWidth: 150,
-                                                                borderRadius: 1.5,
-                                                                mt: 0.5,
-                                                                p: 0.5,
-                                                                '& .MuiMenuItem-root': {
-                                                                    borderRadius: 1,
-                                                                    mx: 0.5,
-                                                                    my: 0.25,
-                                                                    px: 1.5
-                                                                }
+                                                                boxShadow: 3
                                                             }
                                                         }}
                                                     >
-                                                        <MenuItem
-                                                            onClick={(e) => handleEditDiscussion(e, discussion.id)}
-                                                            sx={{ 
-                                                                color: 'primary.main',
-                                                                '&:hover': { 
-                                                                    bgcolor: alpha(theme.palette.primary.main, 0.08)
-                                                                }
-                                                            }}
-                                                        >
-                                                            <EditIcon fontSize="small" sx={{ mr: 1.5 }} />
-                                                            Modifier
-                                                        </MenuItem>
-                                                        <MenuItem
+                                                        <MenuItem 
                                                             onClick={handleDeleteDiscussion}
                                                             sx={{ 
                                                                 color: 'error.main',
-                                                                '&:hover': { 
-                                                                    bgcolor: alpha(theme.palette.error.main, 0.08)
-                                                                }
+                                                                '&:hover': { bgcolor: 'rgba(211, 47, 47, 0.04)' }
                                                             }}
                                                         >
-                                                            <DeleteIcon fontSize="small" sx={{ mr: 1.5 }} />
+                                                            <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
                                                             Supprimer
                                                         </MenuItem>
                                                     </Menu>
@@ -392,42 +416,9 @@ export default function SideBar({onSelectConversation, modelName}: {
                                     </ListItem>
                                 ))
                             ) : !loading && !error ? (
-                                <Box 
-                                    sx={{ 
-                                        display: 'flex', 
-                                        flexDirection: 'column', 
-                                        alignItems: 'center', 
-                                        justifyContent: 'center',
-                                        py: 4,
-                                        px: 2,
-                                        textAlign: 'center',
-                                        borderRadius: 2,
-                                        bgcolor: alpha(theme.palette.background.paper, 0.5),
-                                        border: `1px dashed ${alpha(theme.palette.divider, 0.2)}`
-                                    }}
-                                >
-                                    <AddCircleOutlineIcon 
-                                        sx={{ 
-                                            fontSize: 40, 
-                                            color: 'text.secondary',
-                                            opacity: 0.6,
-                                            mb: 1
-                                        }} 
-                                    />
-                                    <Typography 
-                                        variant="body2" 
-                                        color="text.secondary"
-                                        sx={{ mb: 1 }}
-                                    >
-                                        Aucune conversation disponible
-                                    </Typography>
-                                    <Typography 
-                                        variant="caption" 
-                                        color="text.disabled"
-                                    >
-                                        Créez une nouvelle conversation pour commencer
-                                    </Typography>
-                                </Box>
+                                <Typography variant="body2" color="text.secondary" sx={{mt: 2}}>
+                                    Aucune discussion disponible
+                                </Typography>
                             ) : null}
                         </List>
                     </Box>

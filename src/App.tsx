@@ -3,10 +3,12 @@ import InputBox from "./components/InputBox";
 import SideBar from "./components/Sidebar";
 import ChatContainer from "./components/ChatContainer";
 import SettingsPanel from "./components/SettingsPanel";
+import Documents from "./components/Documents";
 import { useState, useEffect } from "react";
 import { getMessagesByDiscussion } from "./services/message_service";
 import { continueDiscussion } from "./services/generate_services";
 import { getSettings } from "./services/settings_service";
+import { searchInternal } from "./services/search_service";
 
 const theme = createTheme({
   palette: {
@@ -30,6 +32,7 @@ const App = () => {
   const [settingsPanelCollapsed, setSettingsPanelCollapsed] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<string>('chat');
 
   // Fonction pour charger les paramètres
   const loadSettings = async () => {
@@ -99,7 +102,8 @@ const App = () => {
     loadMessages();
   }, [currentDiscussionId]);
 
-  const handleSendMessage = async (message: string) => {
+  // Fonction pour gérer l'envoi de message
+  const handleSendMessage = async (message: string, useInternalSearch: boolean = false) => {
     if (!currentDiscussionId) {
       setError("Veuillez sélectionner ou créer une discussion");
       return;
@@ -108,7 +112,8 @@ const App = () => {
     console.log("Envoi du message avec les paramètres suivants:", {
       discussionId: currentDiscussionId,
       message,
-      selectedSettingId
+      selectedSettingId,
+      useInternalSearch
     });
     
     // Ajouter le message de l'utilisateur à l'interface
@@ -123,23 +128,54 @@ const App = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Continuer une discussion existante
-      const response = await continueDiscussion(
-        currentDiscussionId, 
-        message,
-        undefined, // additionalInfo
-        selectedSettingId || undefined // settingsId
-      );
-      console.log("Réponse reçue avec le contexte:", response);
-      
-      // Ajouter la réponse de l'assistant à l'interface
-      const assistantMessage = { 
-        text: response.response, 
-        sender: 'assistant', 
-        isUser: false,
-        timestamp: new Date().toISOString()
-      };
-      setMessages(prevMessages => [...prevMessages, assistantMessage]);
+      if (useInternalSearch) {
+        // Utiliser la recherche interne avec le service de génération
+        const response = await searchInternal({
+          query: message,
+          discussion_id: currentDiscussionId,
+          settings_id: selectedSettingId || undefined,
+          limit: 5
+        });
+
+        console.log("Réponse de recherche interne reçue:", response);
+        
+        // Ajouter des informations sur les documents utilisés
+        let responseText = response.response;
+        if (response.documents_used && response.documents_used.length > 0) {
+          responseText += "\n\n---\n\n*Sources consultées:*\n";
+          response.documents_used.forEach((doc, index) => {
+            responseText += `${index + 1}. ${doc.title} (score: ${doc.score.toFixed(2)})\n`;
+          });
+        }
+        
+        // Ajouter la réponse de l'assistant à l'interface
+        const assistantMessage = { 
+          text: responseText, 
+          sender: 'assistant', 
+          isUser: false,
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prevMessages => [...prevMessages, assistantMessage]);
+      } else {
+        // Continuer une discussion existante (comportement normal)
+        const response = await continueDiscussion(
+          currentDiscussionId, 
+          message,
+          undefined, // additionalInfo
+          selectedSettingId || undefined // settingsId
+        );
+        
+        console.log("Réponse standard reçue:", response);
+        
+        // Ajouter la réponse de l'assistant à l'interface
+        const assistantMessage = { 
+          text: response.response, 
+          sender: 'assistant', 
+          isUser: false,
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prevMessages => [...prevMessages, assistantMessage]);
+      }
     } catch (error) {
       console.error("Erreur lors de l'envoi du message:", error);
       setError("Erreur lors de l'envoi du message");
@@ -151,6 +187,12 @@ const App = () => {
   const handleSelectConversation = (id: string) => {
     console.log(`Sélection de la discussion: ${id}`);
     setCurrentDiscussionId(id);
+    setCurrentPage('chat');
+  };
+
+  const handleNavigateTo = (page: string) => {
+    console.log(`Navigation vers: ${page}`);
+    setCurrentPage(page);
   };
 
   const handleCloseError = () => {
@@ -165,6 +207,7 @@ const App = () => {
         <SideBar 
           onSelectConversation={handleSelectConversation} 
           modelName="DeepSeek" 
+          onNavigateTo={handleNavigateTo}
         />
 
         {/* Conteneur principal */}
@@ -179,36 +222,51 @@ const App = () => {
             overflow: "hidden"
           }}
         >
-          {/* Conteneur du chat et de l'input - FIXE AU CENTRE */}
-          <Box 
-            sx={{
-              position: "absolute",
-              left: "50%",
-              top: 0,
-              bottom: 0,
-              transform: "translateX(-50%)",
-              width: "700px",
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              padding: "60px 0 20px 0"
-            }}
-          >
-            {/* Zone de chat (prend tout l'espace disponible) */}
-            <Box sx={{ flex: 1, overflow: "hidden", mb: 2 }}>
-              <ChatContainer messages={messages} isLoading={isLoading} />
+          {/* Affichage conditionnel en fonction de la page actuelle */}
+          {currentPage === 'chat' ? (
+            /* Conteneur du chat et de l'input - FIXE AU CENTRE */
+            <Box 
+              sx={{
+                position: "absolute",
+                left: "50%",
+                top: 0,
+                bottom: 0,
+                transform: "translateX(-50%)",
+                width: "700px",
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                padding: "60px 0 20px 0"
+              }}
+            >
+              {/* Zone de chat (prend tout l'espace disponible) */}
+              <Box sx={{ flex: 1, overflow: "hidden", mb: 2 }}>
+                <ChatContainer messages={messages} isLoading={isLoading} />
+              </Box>
+              
+              {/* Zone d'input (fixée en bas) */}
+              <Box width="100%" sx={{ marginBottom: "20px" }}>
+                <InputBox 
+                  onSend={handleSendMessage} 
+                  disabled={!currentDiscussionId || isLoading} 
+                  placeholder={!currentDiscussionId ? "Veuillez créer ou sélectionner une discussion" : "Entrez votre message..."}
+                />
+              </Box>
             </Box>
-            
-            {/* Zone d'input (fixée en bas) */}
-            <Box width="100%" sx={{ marginBottom: "20px" }}>
-              <InputBox 
-                onSend={handleSendMessage} 
-                disabled={!currentDiscussionId || isLoading} 
-                placeholder={!currentDiscussionId ? "Veuillez créer ou sélectionner une discussion" : "Entrez votre message..."}
-              />
+          ) : currentPage === 'documents' ? (
+            /* Page Documents */
+            <Box 
+              sx={{
+                width: "100%",
+                height: "100%",
+                overflow: "auto",
+                padding: "60px 0 20px 0"
+              }}
+            >
+              <Documents />
             </Box>
-          </Box>
+          ) : null}
 
           {/* Panneau de paramètres */}
           <Box
