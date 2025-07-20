@@ -74,15 +74,14 @@ export const filterMetadata = (metadata: any): any => {
   
   const keysToRemove = [
     'embeddings', 'tokens', 'tokens_no_stopwords', 'stemmed_tokens', 
-    'lemmatized_tokens', 'named_entities_spacy', 
-    'named_entities_flair', 'image', 'images'
+     'image', 'images'
   ];
   
   keysToRemove.forEach(key => {
     if (key in filteredMetadata) {
       delete filteredMetadata[key];
     }
-  });
+  }); 
   
   if (Array.isArray(filteredMetadata)) {
     return filteredMetadata.map(item => {
@@ -144,30 +143,6 @@ export const extractMetadataTags = (doc: DocumentResponse): MetadataTag[] => {
     });
   }
 
-  // Traitement des entités nommées de Spacy
-  if (metadata.named_entities_spacy) {
-    Object.entries(metadata.named_entities_spacy).forEach(([type, entities]) => {
-      if (Array.isArray(entities)) {
-        entities.forEach(entity => {
-          let category: MetadataCategory = 'autre';
-          switch(type) {
-            case 'PER':
-              category = 'personne';
-              break;
-            case 'LOC':
-              category = 'lieu';
-              break;
-            case 'ORG':
-              category = 'organisation';
-              break;
-            default:
-              category = 'entité';
-          }
-          addTag(entity, category);
-        });
-      }
-    });
-  }
 
   // Traitement des dates extraites
   if (metadata.dates && Array.isArray(metadata.dates)) {

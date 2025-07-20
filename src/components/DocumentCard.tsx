@@ -1,7 +1,8 @@
-import { Card, CardMedia, CardContent, Box, Typography, useTheme, alpha } from "@mui/material";
+import { Card, CardMedia, CardContent, Box, Typography, useTheme, alpha, Stack, Chip, Popper, Paper } from "@mui/material";
 import DescriptionIcon from "@mui/icons-material/Description";
 import { DocumentResponse } from "../types/document";
 import { formatFileName, getDocumentId, getDocumentImage } from "../utils/documentUtils";
+import { useState } from "react";
 
 interface DocumentCardProps {
   document: DocumentResponse;
@@ -12,6 +13,19 @@ interface DocumentCardProps {
 export default function DocumentCard({ document: doc, onClick, index }: DocumentCardProps) {
   const theme = useTheme();
   const image = getDocumentImage(doc);
+  const llmEntities = doc.metadata?.llm_entities || [];
+  const llmSummary = doc.metadata?.llm_summary || '';
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+
+  const handleMouseEnter = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMouseLeave = () => {
+    setAnchorEl(null);
+  };
+
+  const open = Boolean(anchorEl);
 
   return (
     <Card 
@@ -33,6 +47,8 @@ export default function DocumentCard({ document: doc, onClick, index }: Document
         }
       }}
       onClick={() => onClick(doc)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <Box sx={{ position: 'relative', pt: '100%', overflow: 'hidden' }}>
         {image ? (
@@ -88,12 +104,11 @@ export default function DocumentCard({ document: doc, onClick, index }: Document
       </Box>
       <CardContent sx={{ 
         py: 1, 
-        px: 1, 
+        px: 2,
         flexGrow: 1,
-        minHeight: '60px',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
+        flexDirection: 'column',
+        gap: 1
       }}>
         {doc.metadata?.filename && (
           <Typography variant="body2" align="center" noWrap>
@@ -101,6 +116,62 @@ export default function DocumentCard({ document: doc, onClick, index }: Document
           </Typography>
         )}
       </CardContent>
+
+      <Popper 
+        open={open && (!!llmSummary || llmEntities.length > 0)} 
+        anchorEl={anchorEl}
+        placement="right"
+        sx={{ zIndex: 1300 }}
+      >
+        <Paper 
+          sx={{ 
+            p: 2, 
+            maxWidth: 300,
+            bgcolor: 'background.paper',
+            boxShadow: theme.shadows[8],
+            borderRadius: 2,
+            mt: 1,
+            ml: 1
+          }}
+        >
+          {llmSummary && (
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                fontStyle: 'italic',
+                color: 'text.secondary',
+                fontSize: '0.85rem',
+                mb: llmEntities.length > 0 ? 2 : 0
+              }}
+            >
+              {llmSummary}
+            </Typography>
+          )}
+
+          {llmEntities.length > 0 && (
+            <Box sx={{ 
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 0.5,
+              justifyContent: 'flex-end'
+            }}>
+              {llmEntities.slice(0, 5).map((entity: any, idx: number) => (
+                <Chip
+                  key={idx}
+                  label={entity.text}
+                  size="small"
+                  sx={{ 
+                    height: 24,
+                    fontSize: '0.75rem',
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    color: theme.palette.primary.main
+                  }}
+                />
+              ))}
+            </Box>
+          )}
+        </Paper>
+      </Popper>
     </Card>
   );
 }

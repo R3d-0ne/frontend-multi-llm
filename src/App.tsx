@@ -134,7 +134,7 @@ const App = () => {
           query: message,
           discussion_id: currentDiscussionId,
           settings_id: selectedSettingId || undefined,
-          limit: 5
+          limit: 10
         });
 
         console.log("Réponse de recherche interne reçue:", response);
@@ -153,7 +153,8 @@ const App = () => {
           text: responseText, 
           sender: 'assistant', 
           isUser: false,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          documents: response.documents_used || []
         };
         setMessages(prevMessages => [...prevMessages, assistantMessage]);
       } else {

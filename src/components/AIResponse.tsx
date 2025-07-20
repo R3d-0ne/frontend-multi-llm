@@ -1,14 +1,20 @@
-import { Box, Typography, Paper, IconButton, Collapse } from "@mui/material";
+import { Box, Typography, Paper, IconButton, Collapse, Card, CardMedia, CardContent, Divider, Grid } from "@mui/material";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useState } from "react";
+import { getDocumentImage } from "../utils/documentUtils";
 
 interface AiResponseProps {
   text: string;
+  documents?: Array<{
+    title: string;
+    score: number;
+    metadata?: any;
+  }>;
 }
 
-export default function AiResponse({ text }: AiResponseProps) {
+export default function AiResponse({ text, documents = [] }: AiResponseProps) {
   const [showThink, setShowThink] = useState(false);
 
   // Vérifier si le texte contient une balise <think>
@@ -27,13 +33,11 @@ export default function AiResponse({ text }: AiResponseProps) {
   return (
     <Box sx={{ display: "flex", justifyContent: "flex-start", alignItems: "flex-start", width: "100%", p: 1, pl: 2 }}>
       {/* Icône pour afficher/cacher <think> */}
-        <>   {thinkText && (
+      {thinkText && (
         <IconButton onClick={() => setShowThink(!showThink)} sx={{ mt: 1, mr: 1 }}>
           <InfoOutlinedIcon sx={{ color: "grey.500" }} />
         </IconButton>
       )}
-
-        </>
 
       <Paper elevation={0}
         sx={{
@@ -134,6 +138,90 @@ export default function AiResponse({ text }: AiResponseProps) {
               </Typography>
             );
           })}
+
+          {/* Affichage des documents sources */}
+          {documents && documents.length > 0 && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                Documents sources :
+              </Typography>
+              <Grid container spacing={1}>
+                {documents.map((doc, index) => {
+                  const image = getDocumentImage(doc);
+                  return (
+                    <Grid item xs={4} key={index}>
+                      <Card 
+                        sx={{ 
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          bgcolor: 'background.paper',
+                          '&:hover': {
+                            transform: 'scale(1.02)',
+                            transition: 'transform 0.2s'
+                          }
+                        }}
+                      >
+                        <Box sx={{ position: 'relative', pt: '100%', overflow: 'hidden' }}>
+                          {image ? (
+                            <CardMedia
+                              component="img"
+                              sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                bgcolor: 'background.paper'
+                              }}
+                              image={image}
+                              alt={doc.title}
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.parentElement?.classList.add('fallback-active');
+                              }}
+                            />
+                          ) : (
+                            <Box 
+                              sx={{ 
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                bgcolor: 'action.hover',
+                                p: 1
+                              }}
+                            >
+                              <Typography variant="caption" color="text.secondary" align="center">
+                                {doc.title}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                        <CardContent sx={{ py: 0.5, px: 1 }}>
+                          <Typography variant="caption" noWrap>
+                            {doc.title}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Score: {doc.score.toFixed(2)}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            </>
+          )}
         </>
       </Paper>
     </Box>

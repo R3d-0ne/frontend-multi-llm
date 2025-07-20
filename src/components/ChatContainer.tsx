@@ -9,6 +9,11 @@ interface Message {
   sender: string;
   isUser?: boolean;
   timestamp?: string;
+  documents?: Array<{
+    title: string;
+    score: number;
+    metadata?: any;
+  }>;
 }
 
 interface ChatContainerProps {
@@ -98,7 +103,7 @@ export default function ChatContainer({messages, isLoading = false}: ChatContain
                             >
                                 {isUserMessage ? 
                                     <Message text={msg.text}/> : 
-                                    <AiResponse text={msg.text}/>
+                                    <AiResponse text={msg.text} documents={msg.documents}/>
                                 }
                             </Box>
                         );
