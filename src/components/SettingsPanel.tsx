@@ -1,9 +1,9 @@
-import {useState, useEffect} from "react";
-import {Box, Button, Collapse, Grid, MenuItem, TextField, Typography, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions} from "@mui/material";
+import { useState, useEffect } from "react";
+import { Box, Button, Collapse, Grid, MenuItem, TextField, Typography, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import MemoryIcon from "@mui/icons-material/Memory";
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"; // Icône du bouton Valider
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import AddIcon from '@mui/icons-material/Add';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
@@ -12,27 +12,33 @@ import { List, ListItem, ListItemText } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
 import DocumentUpload from "./DocumentUpload";
+import { getAvailableModels, selectModel } from "../services/generate_services"; // Importer les fonctions
+
+interface LLMModel {
+  id: string;
+  name: string;
+  provider: string;
+  size?: number;
+}
 
 interface SettingsPanelProps {
     settings: any[];
-    models: string[];
-    modes: string[];
     onSettingChange?: (settingId: string) => void;
     selectedSettingId?: string | null;
     collapsed?: boolean;
     onCollapse?: (collapsed: boolean) => void;
     onSettingsUpdated?: () => void;
+    onModelChange?: (modelId: string) => void; // Ajout de cette prop pour gérer le changement de modèle
 }
 
 export default function SettingsPanel({
-    settings, 
-    models, 
-    modes, 
+    settings,
     onSettingChange,
     selectedSettingId,
     collapsed = false,
     onCollapse,
-    onSettingsUpdated
+    onSettingsUpdated,
+    onModelChange
 }: SettingsPanelProps) {
     const [selectedTab, setSelectedTab] = useState<string | null>(null);
     const [selectedValues, setSelectedValues] = useState({
@@ -46,6 +52,30 @@ export default function SettingsPanel({
         content: ''
     });
     const theme = useTheme();
+
+    // État pour stocker les modèles LLM disponibles
+    const [availableModels, setAvailableModels] = useState<LLMModel[]>([]);
+    const [loadingModels, setLoadingModels] = useState<boolean>(false);
+    const [modelError, setModelError] = useState<string | null>(null);
+
+    // Charger les modèles disponibles
+    useEffect(() => {
+        const fetchModels = async () => {
+            try {
+                setLoadingModels(true);
+                const models = await getAvailableModels();
+                setAvailableModels(models);
+                setModelError(null);
+            } catch (error) {
+                console.error("Erreur lors du chargement des modèles LLM:", error);
+                setModelError("Impossible de charger la liste des modèles");
+            } finally {
+                setLoadingModels(false);
+            }
+        };
+
+        fetchModels();
+    }, []);
 
     // Mettre à jour la valeur sélectionnée lorsque selectedSettingId change
     useEffect(() => {
@@ -71,11 +101,6 @@ export default function SettingsPanel({
     const handleChange = (field: string) => (event: any) => {
         const newValue = event.target.value;
         setSelectedValues((prev) => ({...prev, [field]: newValue}));
-        
-        // Si le champ est "settings" et que onSettingChange est défini, appeler la fonction
-        if (field === "settings" && onSettingChange) {
-            onSettingChange(newValue);
-        }
     };
 
     const handleListItemClick = (settingId: string) => {
@@ -83,12 +108,37 @@ export default function SettingsPanel({
         setSelectedValues(prev => ({...prev, settings: settingId}));
     };
 
-    const handleValidate = () => {
-        // Appliquer le setting sélectionné à la discussion
+    // Fonction séparée pour appliquer le paramètre sélectionné
+    const applySettings = () => {
         const settingToApply = selectedValues.settings;
         if (settingToApply && onSettingChange) {
-            // On envoie l'ID du setting pour que le backend puisse le récupérer
+            console.log("Tentative d'application du paramètre:", settingToApply);
             onSettingChange(settingToApply);
+        }
+    };
+
+    // Fonction séparée pour appliquer le modèle sélectionné
+    const applyModel = () => {
+        const modelToApply = selectedValues.model;
+        if (modelToApply && onModelChange) {
+            console.log("Tentative de sélection du modèle:", modelToApply);
+
+            // Appeler l'API pour définir le modèle côté serveur
+            selectModel(modelToApply)
+                .then(response => {
+                    console.log("Réponse de sélection du modèle:", response);
+                    // Vérifier si la sélection a réussi
+                    if (response && response.status === "success") {
+                        console.log("Modèle sélectionné avec succès:", modelToApply);
+                        // Informer le composant parent du changement
+                        onModelChange(modelToApply);
+                    } else {
+                        console.error("Échec de la sélection du modèle:", response);
+                    }
+                })
+                .catch(error => {
+                    console.error("Erreur lors de la sélection du modèle:", error);
+                });
         }
     };
 
@@ -111,19 +161,29 @@ export default function SettingsPanel({
         return setting?.payload?.title || "Paramètre sans titre";
     };
 
+    // Fonction pour obtenir le nom d'affichage d'un modèle
+    const getModelDisplayName = (modelId: string) => {
+        const model = availableModels.find(m => m.id === modelId);
+        if (model) {
+            const sizeDisplay = model.size ? ` (${Math.round(model.size / 1024 / 1024)}MB)` : '';
+            return `${model.name}${sizeDisplay}`;
+        }
+        return modelId;
+    };
+
     if (collapsed) {
         return (
-            <Box sx={{ 
-                position: 'fixed', 
-                right: 0, 
-                top: '80px', 
-                zIndex: 1000 
+            <Box sx={{
+                position: 'fixed',
+                right: 0,
+                top: '80px',
+                zIndex: 1000
             }}>
                 <Tooltip title="Afficher les paramètres">
-                    <IconButton 
+                    <IconButton
                         onClick={toggleCollapse}
-                        sx={{ 
-                            bgcolor: 'background.paper', 
+                        sx={{
+                            bgcolor: 'background.paper',
                             boxShadow: 2,
                             borderRadius: '50% 0 0 50%',
                             p: 1.5,
@@ -142,17 +202,17 @@ export default function SettingsPanel({
     return (
         <>
             {/* Bouton pour replier le panneau - position fixe en haut */}
-            <Box sx={{ 
-                position: 'fixed', 
-                right: collapsed ? '10px' : '300px', 
-                top: '80px', 
+            <Box sx={{
+                position: 'fixed',
+                right: collapsed ? '10px' : '300px',
+                top: '80px',
                 zIndex: 1000,
                 width: 'auto',
                 transition: 'right 0.3s ease'
             }}>
                 <Tooltip title={collapsed ? "Afficher les paramètres" : "Masquer les paramètres"}>
-                    <IconButton 
-                        onClick={toggleCollapse} 
+                    <IconButton
+                        onClick={toggleCollapse}
                         size="large"
                         sx={{
                             bgcolor: 'background.paper',
@@ -172,10 +232,10 @@ export default function SettingsPanel({
                     </IconButton>
                 </Tooltip>
             </Box>
-            
+
             {/* Contenu du panneau - avec marge en haut pour laisser place au bouton */}
-            <Box sx={{ 
-                mt: '60px', 
+            <Box sx={{
+                mt: '60px',
                 width: '100%',
                 height: 'calc(100vh - 80px)',
                 overflow: 'hidden',
@@ -184,9 +244,9 @@ export default function SettingsPanel({
             }}>
                 {/* Conteneur des boutons principaux */}
                 <Box sx={{
-                    p: 2, 
-                    bgcolor: "transparent", 
-                    boxShadow: "none", 
+                    p: 2,
+                    bgcolor: "transparent",
+                    boxShadow: "none",
                     borderRadius: 0
                 }}>
                     <Grid container spacing={2} direction="column" justifyContent="center" width={"100%"}>
@@ -231,8 +291,8 @@ export default function SettingsPanel({
                 <Box sx={{ mt: 2 }}>
                     {/* Récapitulatif - affiché quand aucun panneau n'est sélectionné */}
                     <Collapse in={!selectedTab}>
-                        <Box sx={{ 
-                            p: 2, 
+                        <Box sx={{
+                            p: 2,
                             bgcolor: 'background.paper',
                             borderRadius: 1,
                             boxShadow: 1
@@ -244,15 +304,17 @@ export default function SettingsPanel({
                                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                                     <SettingsIcon fontSize="small" color="action" />
                                     <Typography variant="body2">
-                                        Paramètre : {selectedValues.settings ? 
-                                            getSettingName(selectedValues.settings) : 
+                                        Paramètre : {selectedValues.settings ?
+                                            getSettingName(selectedValues.settings) :
                                             "Aucun paramètre sélectionné"}
                                     </Typography>
                                 </Box>
                                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                                     <MemoryIcon fontSize="small" color="action" />
                                     <Typography variant="body2">
-                                        Modèle : {selectedValues.model || "Aucun modèle sélectionné"}
+                                        Modèle : {selectedValues.model ?
+                                            getModelDisplayName(selectedValues.model) :
+                                            "Aucun modèle sélectionné"}
                                     </Typography>
                                 </Box>
                             </Box>
@@ -261,8 +323,8 @@ export default function SettingsPanel({
 
                     {/* Panneau Settings */}
                     <Collapse in={selectedTab === "settings"}>
-                        <Box sx={{ 
-                            display: 'flex', 
+                        <Box sx={{
+                            display: 'flex',
                             flexDirection: 'column',
                             bgcolor: 'background.paper',
                             borderRadius: 1,
@@ -270,9 +332,9 @@ export default function SettingsPanel({
                             height: '100%',
                             mb: 2
                         }}>
-                            <Box sx={{ 
-                                display: 'flex', 
-                                justifyContent: 'flex-end', 
+                            <Box sx={{
+                                display: 'flex',
+                                justifyContent: 'flex-end',
                                 alignItems: 'center',
                                 p: 1.5,
                                 borderBottom: '1px solid',
@@ -292,7 +354,7 @@ export default function SettingsPanel({
                                 <Button
                                     variant="contained"
                                     color="primary"
-                                    onClick={handleValidate}
+                                    onClick={applySettings}
                                     disabled={!selectedValues.settings}
                                     size="small"
                                     sx={{ borderRadius: 1 }}
@@ -300,8 +362,8 @@ export default function SettingsPanel({
                                     Appliquer
                                 </Button>
                             </Box>
-                            <List sx={{ 
-                                flexGrow: 1, 
+                            <List sx={{
+                                flexGrow: 1,
                                 overflow: 'auto',
                                 p: 0
                             }}>
@@ -310,7 +372,7 @@ export default function SettingsPanel({
                                         component="div"
                                         key={setting.id}
                                         onClick={() => handleListItemClick(setting.id)}
-                                        sx={{ 
+                                        sx={{
                                             cursor: 'pointer',
                                             py: 0.75,
                                             px: 2,
@@ -324,7 +386,7 @@ export default function SettingsPanel({
                                             })
                                         }}
                                     >
-                                        <ListItemText 
+                                        <ListItemText
                                             primary={setting.payload?.title || "Sans titre"}
                                             secondary={setting.payload?.content || "Aucun contenu"}
                                             primaryTypographyProps={{
@@ -345,19 +407,20 @@ export default function SettingsPanel({
                         </Box>
                     </Collapse>
 
-                    {/* Panneau Models */}
+                    {/* Panneau Models - Modifié pour utiliser les modèles dynamiques */}
                     <Collapse in={selectedTab === "models"}>
                         <Box sx={{p: 2, bgcolor: "background.paper", borderRadius: 2, boxShadow: 1, mb: 2}}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                                 <Typography variant="subtitle1" fontWeight="bold">
-                                    Modèles
+                                    Modèles LLM
                                 </Typography>
                                 <Button
                                     variant="contained"
                                     color="primary"
                                     size="small"
                                     startIcon={<CheckCircleOutlineIcon/>}
-                                    onClick={handleValidate}
+                                    onClick={applyModel}
+                                    disabled={!selectedValues.model}
                                     sx={{
                                         borderRadius: 2,
                                         py: 0.8,
@@ -365,41 +428,58 @@ export default function SettingsPanel({
                                         boxShadow: 1
                                     }}
                                 >
-                                    Valider
+                                    Appliquer
                                 </Button>
                             </Box>
-                            <TextField
-                                select
-                                fullWidth
-                                label="Sélectionner un modèle"
-                                value={selectedValues.model}
-                                onChange={handleChange("model")}
-                                variant="outlined"
-                                margin="normal"
-                                SelectProps={{
-                                    MenuProps: {
-                                        PaperProps: {
-                                            sx: {
-                                                maxHeight: 300
+
+                            {loadingModels ? (
+                                <Typography variant="body2" color="text.secondary">
+                                    Chargement des modèles...
+                                </Typography>
+                            ) : modelError ? (
+                                <Typography variant="body2" color="error">
+                                    {modelError}
+                                </Typography>
+                            ) : (
+                                <TextField
+                                    select
+                                    fullWidth
+                                    label="Sélectionner un modèle"
+                                    value={selectedValues.model}
+                                    onChange={handleChange("model")}
+                                    variant="outlined"
+                                    margin="normal"
+                                    SelectProps={{
+                                        MenuProps: {
+                                            PaperProps: {
+                                                sx: {
+                                                    maxHeight: 300
+                                                }
                                             }
                                         }
-                                    }
-                                }}
-                            >
-                                {models.map((option, index) => (
-                                    <MenuItem key={index} value={option} sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                                        <Typography variant="body1">{option}</Typography>
-                                    </MenuItem>
-                                ))}
-                            </TextField>
+                                    }}
+                                >
+                                    {availableModels.map((model) => (
+                                        <MenuItem
+                                            key={model.id}
+                                            value={model.id}
+                                            sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+                                        >
+                                            <Typography variant="body1">
+                                                {model.name} {model.size ? `(${Math.round(model.size / 1024 / 1024)}MB)` : ''}
+                                            </Typography>
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
+                            )}
                         </Box>
                     </Collapse>
                 </Box>
             </Box>
 
             {/* Dialog pour créer un nouveau paramètre */}
-            <Dialog 
-                open={newSettingDialogOpen} 
+            <Dialog
+                open={newSettingDialogOpen}
                 onClose={() => setNewSettingDialogOpen(false)}
                 maxWidth="sm"
                 fullWidth

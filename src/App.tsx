@@ -33,6 +33,8 @@ const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<string>('chat');
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+
 
   // Fonction pour charger les paramètres
   const loadSettings = async () => {
@@ -49,6 +51,11 @@ const App = () => {
       setError("Erreur lors du chargement des paramètres");
     }
   };
+
+  const handleModelChange = (modelId: string) => {
+  console.log("Changement de modèle:", modelId);
+  setSelectedModelId(modelId);
+};
 
   // Fonction pour gérer le changement de paramètres
   const handleSettingChange = (settingId: string) => {
@@ -134,6 +141,7 @@ const App = () => {
           query: message,
           discussion_id: currentDiscussionId,
           settings_id: selectedSettingId || undefined,
+          model_id: selectedModelId || undefined,
           limit: 10
         });
 
@@ -163,7 +171,8 @@ const App = () => {
           currentDiscussionId, 
           message,
           undefined, // additionalInfo
-          selectedSettingId || undefined // settingsId
+          selectedSettingId || undefined, // settingsId
+            selectedModelId || undefined
         );
         
         console.log("Réponse standard reçue:", response);
@@ -286,13 +295,13 @@ const App = () => {
           >
             <SettingsPanel
               settings={settings}
-              models={[]}
-              modes={[]}
               onSettingChange={handleSettingChange}
               selectedSettingId={selectedSettingId}
               collapsed={settingsPanelCollapsed}
               onCollapse={handleSettingsPanelCollapse}
               onSettingsUpdated={loadSettings}
+              onModelChange={handleModelChange}
+
             />
           </Box>
         </Box>

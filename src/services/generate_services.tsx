@@ -6,6 +6,7 @@ interface GenerateRequest {
   settings_id?: string;    // Le setting_id à utiliser, s'il y en a plusieurs
   current_message: string;
   additional_info?: string;
+  model_id?: string;      // Optionnel : modèle LLM à utiliser pour cette requête
 }
 
 // Interface pour la réponse de génération
@@ -14,6 +15,71 @@ interface GenerateResponse {
   context_id: string;
   discussion_id: string;
 }
+
+// Interface pour un modèle LLM
+export interface LLMModel {
+  id: string;
+  name: string;
+  provider: string;
+  size?: number;
+}
+
+/**
+ * Récupère la liste des modèles LLM disponibles
+ * @returns Liste des modèles disponibles
+ */
+export const getAvailableModels = async (): Promise<LLMModel[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/models`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Erreur lors de la récupération des modèles: ${response.status}`, errorText);
+      throw new Error(`Erreur lors de la récupération des modèles: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("Modèles disponibles:", data);
+    return data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des modèles:", error);
+    throw error;
+  }
+};
+
+/**
+ * Définit le modèle LLM par défaut à utiliser
+ * @param modelId Identifiant du modèle à utiliser
+ * @returns Confirmation de la sélection
+ */
+export const selectModel = async (modelId: string): Promise<any> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/models/select?model_id=${modelId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Erreur lors de la sélection du modèle: ${response.status}`, errorText);
+      throw new Error(`Erreur lors de la sélection du modèle: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("Modèle sélectionné:", data);
+    return data;
+  } catch (error) {
+    console.error("Erreur lors de la sélection du modèle:", error);
+    throw error;
+  }
+};
 
 /**
  * Génère une réponse à partir du message de l'utilisateur
@@ -30,13 +96,13 @@ export const generateResponse = async (request: GenerateRequest): Promise<Genera
       },
       body: JSON.stringify(request),
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Erreur lors de la génération de la réponse: ${response.status}`, errorText);
       throw new Error(`Erreur lors de la génération de la réponse: ${response.status} - ${errorText}`);
     }
-    
+
     const data = await response.json();
     console.log("Réponse générée:", data);
     return data;
@@ -51,23 +117,26 @@ export const generateResponse = async (request: GenerateRequest): Promise<Genera
  * @param message Le message de l'utilisateur
  * @param additionalInfo Informations supplémentaires (optionnel)
  * @param settingsId ID des paramètres à utiliser (optionnel)
+ * @param modelId ID du modèle LLM à utiliser (optionnel)
  * @returns La réponse générée avec les IDs de contexte et de discussion
  */
 export const generateNewDiscussion = async (
   message: string,
   additionalInfo?: string,
-  settingsId?: string
+  settingsId?: string,
+  modelId?: string
 ): Promise<GenerateResponse> => {
   console.log(`Création d'une nouvelle discussion avec le message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
-  console.log(`Paramètres utilisés: ${settingsId || 'aucun'}`);
-  
+  console.log(`Paramètres utilisés: ${settingsId || 'aucun'}, Modèle: ${modelId || 'défaut'}`);
+
   try {
     const response = await generateResponse({
       current_message: message,
       additional_info: additionalInfo,
-      settings_id: settingsId
+      settings_id: settingsId,
+      model_id: modelId
     });
-    
+
     console.log(`Nouvelle discussion créée avec succès. ID: ${response.discussion_id}`);
     return response;
   } catch (error) {
@@ -82,25 +151,28 @@ export const generateNewDiscussion = async (
  * @param message Le message de l'utilisateur
  * @param additionalInfo Informations supplémentaires (optionnel)
  * @param settingsId ID des paramètres à utiliser (optionnel)
+ * @param modelId ID du modèle LLM à utiliser (optionnel)
  * @returns La réponse générée avec les IDs de contexte et de discussion
  */
 export const continueDiscussion = async (
   discussionId: string,
   message: string,
   additionalInfo?: string,
-  settingsId?: string
+  settingsId?: string,
+  modelId?: string
 ): Promise<GenerateResponse> => {
   console.log(`Continuation de la discussion ${discussionId} avec le message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
-  console.log(`Paramètres utilisés: ${settingsId || 'aucun'}`);
-  
+  console.log(`Paramètres utilisés: ${settingsId || 'aucun'}, Modèle: ${modelId || 'défaut'}`);
+
   try {
     const response = await generateResponse({
       discussion_id: discussionId,
       current_message: message,
       additional_info: additionalInfo,
-      settings_id: settingsId
+      settings_id: settingsId,
+      model_id: modelId
     });
-    
+
     console.log(`Réponse générée avec succès pour la discussion ${discussionId}`);
     return response;
   } catch (error) {
