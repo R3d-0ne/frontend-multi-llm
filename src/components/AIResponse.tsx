@@ -6,7 +6,7 @@ import { useState } from "react";
 import { getDocumentImage } from "../utils/documentUtils";
 
 interface AiResponseProps {
-  text: string;
+  text?: string; // Peut être undefined
   documents?: Array<{
     title: string;
     score: number;
@@ -14,7 +14,7 @@ interface AiResponseProps {
   }>;
 }
 
-export default function AiResponse({ text, documents = [] }: AiResponseProps) {
+export default function AiResponse({ text = "", documents = [] }: AiResponseProps) {
   const [showThink, setShowThink] = useState(false);
 
   // Vérifier si le texte contient une balise <think>

@@ -22,6 +22,11 @@ interface Message {
   sender: string;
   isUser?: boolean;
   timestamp?: string;
+  documents?: Array<{
+    title: string;
+    score: number;
+    metadata?: any;
+  }>;
 }
 
 const App = () => {
@@ -35,8 +40,6 @@ const App = () => {
   const [currentPage, setCurrentPage] = useState<string>('chat');
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
 
-
-  // Fonction pour charger les paramètres
   const loadSettings = async () => {
     try {
       console.log("Chargement des paramètres...");
@@ -53,27 +56,21 @@ const App = () => {
   };
 
   const handleModelChange = (modelId: string) => {
-  console.log("Changement de modèle:", modelId);
-  setSelectedModelId(modelId);
-};
+    setSelectedModelId(modelId);
+  };
 
-  // Fonction pour gérer le changement de paramètres
   const handleSettingChange = (settingId: string) => {
-    console.log("Changement de paramètre:", settingId);
     setSelectedSettingId(settingId);
   };
 
-  // Fonction pour gérer l'état du panneau de paramètres
   const handleSettingsPanelCollapse = (collapsed: boolean) => {
     setSettingsPanelCollapsed(collapsed);
   };
 
-  // Charger les paramètres au démarrage
   useEffect(() => {
     loadSettings();
   }, []);
 
-  // Charger les messages d'une discussion lorsqu'elle est sélectionnée
   useEffect(() => {
     const loadMessages = async () => {
       if (!currentDiscussionId) {
@@ -83,18 +80,16 @@ const App = () => {
       
       setIsLoading(true);
       setError(null);
+
       try {
-        console.log(`Chargement des messages pour la discussion ${currentDiscussionId}...`);
         const messagesData = await getMessagesByDiscussion(currentDiscussionId);
-        console.log("Messages chargés:", messagesData);
-        
-        // Convertir les messages au format attendu par ChatContainer
         const formattedMessages = messagesData.map(msg => ({
           id: msg.id,
           text: msg.text,
           sender: msg.sender,
           isUser: msg.sender === 'user',
-          timestamp: msg.timestamp || msg.created_at || new Date().toISOString()
+          timestamp: msg.timestamp || msg.created_at || new Date().toISOString(),
+          documents: msg.documents
         }));
         setMessages(formattedMessages);
       } catch (error) {
@@ -109,24 +104,15 @@ const App = () => {
     loadMessages();
   }, [currentDiscussionId]);
 
-  // Fonction pour gérer l'envoi de message
   const handleSendMessage = async (message: string, useInternalSearch: boolean = false) => {
     if (!currentDiscussionId) {
       setError("Veuillez sélectionner ou créer une discussion");
       return;
     }
-    
-    console.log("Envoi du message avec les paramètres suivants:", {
-      discussionId: currentDiscussionId,
-      message,
-      selectedSettingId,
-      useInternalSearch
-    });
-    
-    // Ajouter le message de l'utilisateur à l'interface
-    const userMessage = { 
-      text: message, 
-      sender: 'user', 
+
+    const userMessage = {
+      text: message,
+      sender: 'user',
       isUser: true,
       timestamp: new Date().toISOString()
     };
@@ -134,57 +120,54 @@ const App = () => {
     
     setIsLoading(true);
     setError(null);
+
     try {
       if (useInternalSearch) {
-        // Utiliser la recherche interne avec le service de génération
         const response = await searchInternal({
           query: message,
           discussion_id: currentDiscussionId,
           settings_id: selectedSettingId || undefined,
-          model_id: selectedModelId || undefined,
           limit: 10
         });
 
-        console.log("Réponse de recherche interne reçue:", response);
-        
-        // Ajouter des informations sur les documents utilisés
-        let responseText = response.response;
-        if (response.documents_used && response.documents_used.length > 0) {
-          responseText += "\n\n---\n\n*Sources consultées:*\n";
-          response.documents_used.forEach((doc, index) => {
-            responseText += `${index + 1}. ${doc.title} (score: ${doc.score.toFixed(2)})\n`;
-          });
+        if (response && response.response) {
+          let responseText = response.response;
+          const documents = response.documents_used || [];
+
+          if (documents.length > 0) {
+            responseText += "\n\n---\n\n*Sources consultées:*\n";
+            documents.forEach((doc, index) => {
+              responseText += `${index + 1}. ${doc.title} (score: ${doc.score.toFixed(2)})\n`;
+            });
+          }
+
+          const assistantMessage = {
+            text: responseText,
+            sender: 'assistant',
+            isUser: false,
+            timestamp: new Date().toISOString(),
+            documents
+          };
+          setMessages(prevMessages => [...prevMessages, assistantMessage]);
         }
-        
-        // Ajouter la réponse de l'assistant à l'interface
-        const assistantMessage = { 
-          text: responseText, 
-          sender: 'assistant', 
-          isUser: false,
-          timestamp: new Date().toISOString(),
-          documents: response.documents_used || []
-        };
-        setMessages(prevMessages => [...prevMessages, assistantMessage]);
       } else {
-        // Continuer une discussion existante (comportement normal)
         const response = await continueDiscussion(
-          currentDiscussionId, 
+          currentDiscussionId,
           message,
-          undefined, // additionalInfo
-          selectedSettingId || undefined, // settingsId
-            selectedModelId || undefined
+          undefined,
+          selectedSettingId || undefined,
+          selectedModelId || undefined
         );
-        
-        console.log("Réponse standard reçue:", response);
-        
-        // Ajouter la réponse de l'assistant à l'interface
-        const assistantMessage = { 
-          text: response.response, 
-          sender: 'assistant', 
-          isUser: false,
-          timestamp: new Date().toISOString()
-        };
-        setMessages(prevMessages => [...prevMessages, assistantMessage]);
+
+        if (response?.data?.response) {
+          const assistantMessage = {
+            text: response.data.response,
+            sender: 'assistant',
+            isUser: false,
+            timestamp: new Date().toISOString()
+          };
+          setMessages(prevMessages => [...prevMessages, assistantMessage]);
+        }
       }
     } catch (error) {
       console.error("Erreur lors de l'envoi du message:", error);
@@ -195,13 +178,11 @@ const App = () => {
   };
 
   const handleSelectConversation = (id: string) => {
-    console.log(`Sélection de la discussion: ${id}`);
     setCurrentDiscussionId(id);
     setCurrentPage('chat');
   };
 
   const handleNavigateTo = (page: string) => {
-    console.log(`Navigation vers: ${page}`);
     setCurrentPage(page);
   };
 
@@ -213,15 +194,13 @@ const App = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box display="flex" height="100vh" width="100vw">
-        {/* Barre latérale */}
-        <SideBar 
+        <SideBar
           onSelectConversation={handleSelectConversation} 
           modelName="DeepSeek" 
           onNavigateTo={handleNavigateTo}
         />
 
-        {/* Conteneur principal */}
-        <Box 
+        <Box
           sx={{
             position: "relative",
             flex: 1,
@@ -232,10 +211,8 @@ const App = () => {
             overflow: "hidden"
           }}
         >
-          {/* Affichage conditionnel en fonction de la page actuelle */}
           {currentPage === 'chat' ? (
-            /* Conteneur du chat et de l'input - FIXE AU CENTRE */
-            <Box 
+            <Box
               sx={{
                 position: "absolute",
                 left: "50%",
@@ -250,12 +227,10 @@ const App = () => {
                 padding: "60px 0 20px 0"
               }}
             >
-              {/* Zone de chat (prend tout l'espace disponible) */}
-              <Box sx={{ flex: 1, overflow: "hidden", mb: 2 }}>
+              <Box sx={{ flex: 1, overflow: "auto", mb: 2 }}>
                 <ChatContainer messages={messages} isLoading={isLoading} />
               </Box>
               
-              {/* Zone d'input (fixée en bas) */}
               <Box width="100%" sx={{ marginBottom: "20px" }}>
                 <InputBox 
                   onSend={handleSendMessage} 
@@ -265,8 +240,7 @@ const App = () => {
               </Box>
             </Box>
           ) : currentPage === 'documents' ? (
-            /* Page Documents */
-            <Box 
+            <Box
               sx={{
                 width: "100%",
                 height: "100%",
@@ -278,7 +252,6 @@ const App = () => {
             </Box>
           ) : null}
 
-          {/* Panneau de paramètres */}
           <Box
             sx={{
               position: "fixed",
@@ -301,13 +274,11 @@ const App = () => {
               onCollapse={handleSettingsPanelCollapse}
               onSettingsUpdated={loadSettings}
               onModelChange={handleModelChange}
-
             />
           </Box>
         </Box>
       </Box>
 
-      {/* Snackbar pour afficher les erreurs */}
       <Snackbar
         open={!!error}
         autoHideDuration={6000}
