@@ -23,26 +23,30 @@ interface ChatContainerProps {
 
 export default function ChatContainer({messages, isLoading = false}: ChatContainerProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const prevMessagesLengthRef = useRef(messages.length);
 
+    // Défilement automatique optimisé
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
     };
 
+    // Effet pour le défilement uniquement quand de nouveaux messages arrivent
     useEffect(() => {
-        scrollToBottom();
+        if (messages.length > prevMessagesLengthRef.current) {
+            scrollToBottom();
+            prevMessagesLengthRef.current = messages.length;
+        }
     }, [messages]);
 
-    // Trier les messages par timestamp
+    // Tri des messages optimisé avec mémoisation
     const sortedMessages = useMemo(() => {
+        console.log("Messages reçus dans ChatContainer:", messages);
         return [...messages].sort((a, b) => {
-            // Si les deux messages ont un timestamp, les comparer
             if (a.timestamp && b.timestamp) {
                 return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
             }
-            // Si un seul message a un timestamp, le mettre en premier
-            if (a.timestamp) return -1;
-            if (b.timestamp) return 1;
-            // Si aucun n'a de timestamp, garder l'ordre original
             return 0;
         });
     }, [messages]);

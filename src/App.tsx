@@ -159,9 +159,9 @@ const App = () => {
           selectedModelId || undefined
         );
 
-        if (response?.data?.response) {
+        if (response?.response) {
           const assistantMessage = {
-            text: response.data.response,
+            text: response.response,
             sender: 'assistant',
             isUser: false,
             timestamp: new Date().toISOString()
