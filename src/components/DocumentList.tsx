@@ -1,4 +1,4 @@
-import { Grid, Paper, Typography, Button, Box, CircularProgress, Alert, alpha, useTheme } from "@mui/material";
+import { Grid, Paper, Typography, Button, Box, CircularProgress, Alert, alpha, useTheme, Skeleton } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { DocumentResponse } from "../types/document";
 import DocumentCard from "./DocumentCard";
@@ -9,6 +9,8 @@ interface DocumentListProps {
   error: string | null;
   onDocumentClick: (doc: DocumentResponse) => void;
   onAddClick: () => void;
+  showSkeletons?: boolean;
+  skeletonCount?: number;
 }
 
 export default function DocumentList({ 
@@ -16,11 +18,24 @@ export default function DocumentList({
   loading, 
   error, 
   onDocumentClick, 
-  onAddClick 
+  onAddClick,
+  showSkeletons = false,
+  skeletonCount = 6
 }: DocumentListProps) {
   const theme = useTheme();
 
-  if (loading) {
+  // Composant de skeleton pour le chargement
+  const DocumentSkeleton = () => (
+    <Grid item xs={6} sm={4} md={3} lg={2}>
+      <Paper sx={{ p: 2, height: 200 }}>
+        <Skeleton variant="rectangular" height={120} sx={{ mb: 1 }} />
+        <Skeleton variant="text" height={20} sx={{ mb: 1 }} />
+        <Skeleton variant="text" height={16} width="60%" />
+      </Paper>
+    </Grid>
+  );
+
+  if (loading && documents.length === 0) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
         <CircularProgress />
@@ -71,6 +86,11 @@ export default function DocumentList({
             index={index}
           />
         </Grid>
+      ))}
+      
+      {/* Afficher les skeletons pour le chargement de plus de documents */}
+      {showSkeletons && Array.from({ length: skeletonCount }).map((_, index) => (
+        <DocumentSkeleton key={`skeleton-${index}`} />
       ))}
     </Grid>
   );

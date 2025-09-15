@@ -4,6 +4,7 @@ import SideBar from "./components/Sidebar";
 import ChatContainer from "./components/ChatContainer";
 import SettingsPanel from "./components/SettingsPanel";
 import Documents from "./components/Documents";
+import DocumentQuery from "./components/DocumentQuery";
 import { useState, useEffect } from "react";
 import { getMessagesByDiscussion } from "./services/message_service";
 import { continueDiscussion } from "./services/generate_services";
@@ -39,6 +40,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<string>('chat');
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<any>(null);
 
   const loadSettings = async () => {
     try {
@@ -190,13 +192,19 @@ const App = () => {
     setError(null);
   };
 
+  const handleDocumentClick = (document: any) => {
+    console.log("Document cliqué:", document);
+    setSelectedDocument(document);
+    setCurrentPage('documents');
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box display="flex" height="100vh" width="100vw">
         <SideBar
           onSelectConversation={handleSelectConversation} 
-          modelName="DeepSeek" 
+          modelName="LLM & Search AI" 
           onNavigateTo={handleNavigateTo}
         />
 
@@ -228,7 +236,7 @@ const App = () => {
               }}
             >
               <Box sx={{ flex: 1, overflow: "auto", mb: 2 }}>
-                <ChatContainer messages={messages} isLoading={isLoading} />
+                <ChatContainer messages={messages} isLoading={isLoading} onDocumentClick={handleDocumentClick} />
               </Box>
               
               <Box width="100%" sx={{ marginBottom: "20px" }}>
@@ -248,7 +256,27 @@ const App = () => {
                 padding: "60px 0 20px 0"
               }}
             >
-              <Documents />
+              <Documents selectedDocument={selectedDocument} />
+            </Box>
+          ) : null}
+
+          {currentPage === 'document-query' ? (
+            <Box
+              sx={{
+                width: "100%",
+                height: "100%",
+                overflow: "auto",
+                padding: "60px 0 20px 0"
+              }}
+            >
+              <DocumentQuery 
+                discussionId={currentDiscussionId || undefined}
+                settingsId={selectedSettingId || undefined}
+                onResponse={(response, documentInfo) => {
+                  // Optionnel: ajouter la réponse à la discussion
+                  console.log('Réponse du document:', response, documentInfo);
+                }}
+              />
             </Box>
           ) : null}
 
@@ -289,6 +317,7 @@ const App = () => {
           {error}
         </Alert>
       </Snackbar>
+
     </ThemeProvider>
   );
 };

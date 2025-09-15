@@ -19,9 +19,10 @@ interface Message {
 interface ChatContainerProps {
   messages: Message[];
   isLoading?: boolean;
+  onDocumentClick?: (document: any) => void;
 }
 
-export default function ChatContainer({messages, isLoading = false}: ChatContainerProps) {
+export default function ChatContainer({messages, isLoading = false, onDocumentClick}: ChatContainerProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const prevMessagesLengthRef = useRef(messages.length);
 
@@ -107,7 +108,7 @@ export default function ChatContainer({messages, isLoading = false}: ChatContain
                             >
                                 {isUserMessage ? 
                                     <Message text={msg.text}/> : 
-                                    <AiResponse text={msg.text} documents={msg.documents}/>
+                                    <AiResponse text={msg.text} documents={msg.documents} onDocumentClick={onDocumentClick}/>
                                 }
                             </Box>
                         );

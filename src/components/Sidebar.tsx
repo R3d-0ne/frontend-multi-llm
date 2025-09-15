@@ -161,6 +161,13 @@ export default function SideBar({onSelectConversation, modelName, onNavigateTo}:
         }
     };
 
+    // Fonction pour naviguer vers la page de recherche documentaire
+    const handleNavigateToDocumentQuery = () => {
+        if (onNavigateTo) {
+            onNavigateTo('document-query');
+        }
+    };
+
     // Fonction pour naviguer vers la page Conversations
     const handleNavigateToConversations = () => {
         if (onNavigateTo) {
@@ -270,6 +277,31 @@ export default function SideBar({onSelectConversation, modelName, onNavigateTo}:
                                 }}
                             >
                                 Documents
+                            </Typography>
+                        </Box>
+                        <Box 
+                            sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between', 
+                                mb: 1.5,
+                                p: 1,
+                                borderRadius: 2,
+                                cursor: 'pointer',
+                                '&:hover': {
+                                    bgcolor: alpha(theme.palette.action.hover, 0.1)
+                                }
+                            }}
+                            onClick={handleNavigateToDocumentQuery}
+                        >
+                            <Typography 
+                                variant="h6" 
+                                sx={{ 
+                                    fontWeight: 600,
+                                    letterSpacing: '0.02em'
+                                }}
+                            >
+                                Recherche Documentaire
                             </Typography>
                         </Box>
                         <Box 

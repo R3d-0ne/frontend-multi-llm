@@ -3,7 +3,8 @@ import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useState } from "react";
-import { getDocumentImage } from "../utils/documentUtils";
+import { getDocumentImage, formatFileName } from "../utils/documentUtils";
+import { DocumentResponse } from "../types/document";
 
 interface AiResponseProps {
   text?: string; // Peut être undefined
@@ -11,10 +12,12 @@ interface AiResponseProps {
     title: string;
     score: number;
     metadata?: any;
+    id?: string;
   }>;
+  onDocumentClick?: (document: DocumentResponse) => void;
 }
 
-export default function AiResponse({ text = "", documents = [] }: AiResponseProps) {
+export default function AiResponse({ text = "", documents = [], onDocumentClick }: AiResponseProps) {
   const [showThink, setShowThink] = useState(false);
 
   // Vérifier si le texte contient une balise <think>
@@ -148,7 +151,13 @@ export default function AiResponse({ text = "", documents = [] }: AiResponseProp
               </Typography>
               <Grid container spacing={1}>
                 {documents.map((doc, index) => {
-                  const image = getDocumentImage(doc);
+                  // Adapter la structure des données pour getDocumentImage
+                  const docForImage = {
+                    id: doc.id,
+                    title: doc.title,
+                    metadata: doc.metadata || {}
+                  };
+                  const image = getDocumentImage(docForImage);
                   return (
                     <Grid item xs={4} key={index}>
                       <Card 
@@ -159,9 +168,20 @@ export default function AiResponse({ text = "", documents = [] }: AiResponseProp
                           borderRadius: 1,
                           overflow: 'hidden',
                           bgcolor: 'background.paper',
+                          cursor: onDocumentClick ? 'pointer' : 'default',
                           '&:hover': {
                             transform: 'scale(1.02)',
                             transition: 'transform 0.2s'
+                          }
+                        }}
+                        onClick={() => {
+                          if (onDocumentClick) {
+                            const documentResponse: DocumentResponse = {
+                              id: doc.id || '',
+                              title: doc.title,
+                              metadata: doc.metadata || {}
+                            };
+                            onDocumentClick(documentResponse);
                           }
                         }}
                       >
@@ -202,14 +222,14 @@ export default function AiResponse({ text = "", documents = [] }: AiResponseProp
                               }}
                             >
                               <Typography variant="caption" color="text.secondary" align="center">
-                                {doc.title}
+                                {doc.title.replace(/\.[^/.]+$/, "")}
                               </Typography>
                             </Box>
                           )}
                         </Box>
                         <CardContent sx={{ py: 0.5, px: 1 }}>
                           <Typography variant="caption" noWrap>
-                            {doc.title}
+                            {doc.title.replace(/\.[^/.]+$/, "")}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             Score: {doc.score.toFixed(2)}

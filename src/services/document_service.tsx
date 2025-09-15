@@ -50,11 +50,49 @@ export const deleteDocument = async (documentId: string): Promise<DocumentRespon
   }
 };
 
+// Interface pour la réponse paginée
+interface PaginatedDocumentsResponse {
+  documents: DocumentResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+  next_offset: number | null;
+}
+
 /**
- * Récupère la liste de tous les documents
- * @returns La liste des documents
+ * Récupère la liste des documents avec pagination
+ * @param limit Nombre maximum de documents à récupérer (défaut: 50)
+ * @param offset Nombre de documents à ignorer (défaut: 0)
+ * @returns La réponse paginée avec les documents
  */
-export const listDocuments = async (): Promise<DocumentResponse[]> => {
+export const listDocuments = async (limit: number = 50, offset: number = 0): Promise<PaginatedDocumentsResponse> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/documents/?limit=${limit}&offset=${offset}`);
+    
+    if (!response.ok) {
+      throw new Error(`Erreur lors de la récupération des documents: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Erreur lors de la récupération des documents:", error);
+    return {
+      documents: [],
+      total: 0,
+      limit,
+      offset,
+      has_more: false,
+      next_offset: null
+    };
+  }
+};
+
+/**
+ * Récupère tous les documents (pour compatibilité avec l'ancien code)
+ * @returns La liste de tous les documents
+ */
+export const listAllDocuments = async (): Promise<DocumentResponse[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}/documents/`);
     
@@ -62,7 +100,13 @@ export const listDocuments = async (): Promise<DocumentResponse[]> => {
       throw new Error(`Erreur lors de la récupération des documents: ${response.status}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    // Si c'est la nouvelle structure paginée, retourner seulement les documents
+    if (data.documents) {
+      return data.documents;
+    }
+    // Sinon, retourner la réponse telle quelle (compatibilité)
+    return data;
   } catch (error) {
     console.error("Erreur lors de la récupération des documents:", error);
     return [];

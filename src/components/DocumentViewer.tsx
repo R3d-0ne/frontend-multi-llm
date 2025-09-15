@@ -4,6 +4,7 @@ import { DocumentResponse } from "../types/document";
 import { getDocumentId, getDocumentImage, formatDate } from "../utils/documentUtils";
 import { MetadataTag, METADATA_COLORS } from "../types/metadata";
 import { extractMetadataTags, extractBestEntities } from "../utils/documentUtils";
+import { queryDocument } from "../services/document_query_service";
 
 interface DocumentViewerProps {
   document: DocumentResponse | null;
@@ -39,6 +40,7 @@ export default function DocumentViewer({ document: doc, onClose, onDelete }: Doc
 
   // Ouvrir le document dans une nouvelle fenêtre
   const openInNewWindow = () => {
+    const documentName = (doc.metadata?.filename || doc.title || '').replace(/'/g, "\\'");
     const htmlContent = `
       <!DOCTYPE html>
       <html lang="fr">
@@ -97,11 +99,174 @@ export default function DocumentViewer({ document: doc, onClose, onDelete }: Doc
             height: 100%;
             overflow: auto;
             display: flex;
-            justify-content: center;
-            align-items: center;
+            flex-direction: column;
             background-color: #f5f5f5;
             position: relative;
+          }
+
+          .tabs-container {
+            display: flex;
+            background-color: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 0 24px;
+          }
+
+          .tab {
+            padding: 16px 24px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+            color: #666;
+          }
+
+          .tab:hover {
+            background-color: #f5f5f5;
+            color: #1976d2;
+          }
+
+          .tab.active {
+            color: #1976d2;
+            border-bottom-color: #1976d2;
+            background-color: #f8f9fa;
+          }
+
+          .tab-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             padding: 24px;
+            position: relative;
+          }
+
+          .tab-content.hidden {
+            display: none;
+          }
+
+          .document-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+
+          .search-container {
+            width: 100%;
+            max-width: 800px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 24px;
+          }
+
+          .search-form {
+            margin-bottom: 24px;
+          }
+
+          .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 16px;
+            transition: border-color 0.2s ease;
+          }
+
+          .search-input:focus {
+            outline: none;
+            border-color: #1976d2;
+          }
+
+          .search-button {
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+
+          .search-button:hover {
+            background-color: #1565c0;
+          }
+
+          .search-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+          }
+
+          .response-container {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            border-left: 4px solid #1976d2;
+          }
+
+          .response-text {
+            line-height: 1.6;
+            color: #333;
+            white-space: pre-wrap;
+          }
+
+          .loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #1976d2;
+            font-weight: 500;
+          }
+
+          .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e0e0e0;
+            border-top: 2px solid #1976d2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          }
+
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+
+          .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 16px;
+            border-left: 4px solid #c62828;
+          }
+
+          .example-btn {
+            background-color: #f5f5f5;
+            color: #666;
+            border: 1px solid #e0e0e0;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+          }
+
+          .example-btn:hover {
+            background-color: #1976d2;
+            color: white;
+            border-color: #1976d2;
           }
           
           .document-image {
@@ -530,7 +695,71 @@ export default function DocumentViewer({ document: doc, onClose, onDelete }: Doc
         <div class="main-content">
           <button id="toggle-left" class="toggle-btn toggle-left">&lt;</button>
           <button id="toggle-right" class="toggle-btn toggle-right">&gt;</button>
-          <img src="${imageUrl}" alt="${doc.title || 'Document'}" class="document-image" />
+          
+          <div class="tabs-container">
+            <div class="tab active" data-tab="visualization">
+              <span class="material-icons">visibility</span>
+              Visualisation
+            </div>
+            <div class="tab" data-tab="search">
+              <span class="material-icons">search</span>
+              Interrogation IA
+            </div>
+          </div>
+          
+          <div id="visualization-content" class="tab-content">
+            <img src="${imageUrl}" alt="${doc.title || 'Document'}" class="document-image" />
+          </div>
+          
+          <div id="search-content" class="tab-content hidden">
+            <div class="search-container">
+              <h3 style="margin: 0 0 24px 0; color: #1976d2; display: flex; align-items: center; gap: 8px;">
+                <span class="material-icons">question_answer</span>
+                Interroger ce document
+              </h3>
+              
+              <div class="search-form">
+                <textarea 
+                  id="question-input" 
+                  class="search-input" 
+                  placeholder="Posez votre question sur ce document..."
+                  rows="3"
+                  style="resize: vertical; min-height: 80px;"
+                ></textarea>
+                
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                  <button id="search-btn" class="search-button">
+                    <span class="material-icons">search</span>
+                    Interroger le document
+                  </button>
+                  <button id="clear-btn" class="search-button" style="background-color: #666;">
+                    <span class="material-icons">refresh</span>
+                    Effacer
+                  </button>
+                </div>
+                
+                <div style="margin-top: 16px;">
+                  <p style="margin: 0 0 8px 0; font-weight: 500; color: #666;">Questions d'exemple :</p>
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <button class="example-btn" data-question="Quel est le contenu principal de ce document ?">
+                      Contenu principal
+                    </button>
+                    <button class="example-btn" data-question="Quelles sont les informations importantes ?">
+                      Informations importantes
+                    </button>
+                    <button class="example-btn" data-question="Résume-moi ce document">
+                      Résumé
+                    </button>
+                    <button class="example-btn" data-question="Y a-t-il des dates importantes mentionnées ?">
+                      Dates importantes
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div id="search-results"></div>
+            </div>
+          </div>
         </div>
         
         <div id="right-sidebar" class="sidebar-right">
@@ -684,16 +913,87 @@ export default function DocumentViewer({ document: doc, onClose, onDelete }: Doc
         </div>
         
         <script>
-          // Fonctions pour gérer les panneaux rétractables
-          document.getElementById('toggle-left').addEventListener('click', function() {
-            document.getElementById('left-sidebar').classList.toggle('collapsed');
-          });
-          
-          document.getElementById('toggle-right').addEventListener('click', function() {
-            document.getElementById('right-sidebar').classList.toggle('collapsed');
-          });
+          // Fonctions globales
+          function switchTab(tabName) {
+            // Masquer tous les contenus d'onglets
+            document.querySelectorAll('.tab-content').forEach(content => {
+              content.classList.add('hidden');
+            });
+            
+            // Désactiver tous les onglets
+            document.querySelectorAll('.tab').forEach(tab => {
+              tab.classList.remove('active');
+            });
+            
+            // Afficher le contenu de l'onglet sélectionné
+            document.getElementById(tabName + '-content').classList.remove('hidden');
+            
+            // Activer l'onglet sélectionné
+            document.querySelectorAll('.tab').forEach(tab => {
+              if (tab.onclick && tab.onclick.toString().includes(tabName)) {
+                tab.classList.add('active');
+              }
+            });
+          }
 
-          // Fonction générique pour plier/déplier les sections
+          function setQuestion(question) {
+            document.getElementById('question-input').value = question;
+          }
+
+          function clearSearch() {
+            document.getElementById('question-input').value = '';
+            document.getElementById('search-results').innerHTML = '';
+          }
+
+          async function searchDocument() {
+            const question = document.getElementById('question-input').value.trim();
+            if (!question) {
+              alert('Veuillez saisir une question');
+              return;
+            }
+
+            const searchBtn = document.getElementById('search-btn');
+            const resultsDiv = document.getElementById('search-results');
+            
+            // Désactiver le bouton et afficher le loading
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '<div class="spinner"></div> Interrogation...';
+            
+            // Afficher le loading
+            resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div> Interrogation du document en cours...</div>';
+
+            try {
+              // Appel à l'API de recherche de document
+              const response = await fetch('http://localhost:8000/search/document-query/', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  document_name: '${documentName}',
+                  question: question,
+                  include_context: true,
+                  max_context_length: 5000
+                })
+              });
+
+              const result = await response.json();
+
+              if (result.error) {
+                resultsDiv.innerHTML = '<div class="error">Erreur: ' + result.response + '</div>';
+              } else {
+                resultsDiv.innerHTML = '<div class="response-container"><div class="response-text">' + result.response + '</div></div>';
+              }
+            } catch (error) {
+              console.error('Erreur lors de la recherche:', error);
+              resultsDiv.innerHTML = '<div class="error">Une erreur est survenue lors de l\\'interrogation du document</div>';
+            } finally {
+              // Réactiver le bouton
+              searchBtn.disabled = false;
+              searchBtn.innerHTML = '<span class="material-icons">search</span> Interroger le document';
+            }
+          }
+
           function toggleSection(contentId, iconId) {
             const content = document.getElementById(contentId);
             const icon = document.getElementById(iconId);
@@ -710,17 +1010,59 @@ export default function DocumentViewer({ document: doc, onClose, onDelete }: Doc
             }
           }
 
-          // Style au survol pour tous les headers
-          document.querySelectorAll('.collapsible-header').forEach(header => {
-            header.addEventListener('mouseover', function() {
-              this.style.backgroundColor = '#f0f0f0';
+          // Initialisation
+          document.addEventListener('DOMContentLoaded', function() {
+            // Fonctions pour gérer les panneaux rétractables
+            document.getElementById('toggle-left').addEventListener('click', function() {
+              document.getElementById('left-sidebar').classList.toggle('collapsed');
             });
-            header.addEventListener('mouseout', function() {
-              const contentId = this.nextElementSibling.id;
-              if (document.getElementById(contentId).style.maxHeight === '1000px') {
-                this.style.backgroundColor = '#f8f9fa';
-              }
+            
+            document.getElementById('toggle-right').addEventListener('click', function() {
+              document.getElementById('right-sidebar').classList.toggle('collapsed');
             });
+
+            // Gestion des onglets
+            document.querySelectorAll('.tab').forEach(tab => {
+              tab.addEventListener('click', function() {
+                const tabName = this.getAttribute('data-tab');
+                switchTab(tabName);
+              });
+            });
+
+            // Gestion des boutons de recherche
+            document.getElementById('search-btn').addEventListener('click', searchDocument);
+            document.getElementById('clear-btn').addEventListener('click', clearSearch);
+
+            // Gestion des questions d'exemple
+            document.querySelectorAll('.example-btn').forEach(btn => {
+              btn.addEventListener('click', function() {
+                const question = this.getAttribute('data-question');
+                setQuestion(question);
+              });
+            });
+
+            // Style au survol pour tous les headers
+            document.querySelectorAll('.collapsible-header').forEach(header => {
+              header.addEventListener('mouseover', function() {
+                this.style.backgroundColor = '#f0f0f0';
+              });
+              header.addEventListener('mouseout', function() {
+                const contentId = this.nextElementSibling.id;
+                if (document.getElementById(contentId).style.maxHeight === '1000px') {
+                  this.style.backgroundColor = '#f8f9fa';
+                }
+              });
+            });
+
+            // Permettre la recherche avec Entrée
+            const questionInput = document.getElementById('question-input');
+            if (questionInput) {
+              questionInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                  searchDocument();
+                }
+              });
+            }
           });
         </script>
       </body>

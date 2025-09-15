@@ -1,49 +1,64 @@
 import { useState, useEffect } from "react";
-import { Box } from "@mui/material";
-import { listDocuments, deleteDocument } from "../services/document_service";
+import { Box, Button, Typography, CircularProgress } from "@mui/material";
+import { deleteDocument } from "../services/document_service";
 import { DocumentResponse } from "../types/document";
+import { useDocuments } from "../hooks/useDocuments";
 import DocumentHeader from "./DocumentHeader";
 import DocumentList from "./DocumentList";
 import DocumentViewer from "./DocumentViewer";
 import DocumentUpload from "./DocumentUpload";
 
-export default function Documents() {
-  const [documents, setDocuments] = useState<DocumentResponse[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+interface DocumentsProps {
+  selectedDocument?: any;
+}
+
+export default function Documents({ selectedDocument: propSelectedDocument }: DocumentsProps = {}) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedDocument, setSelectedDocument] = useState<DocumentResponse | null>(null);
+  
+  // Utiliser le hook personnalisé pour la gestion des documents
+  const {
+    documents,
+    loading,
+    error,
+    hasMore,
+    total,
+    loadMore,
+    refresh,
+    isLoadingMore
+  } = useDocuments({ limit: 20, enableCache: true });
 
-  // Charger les documents
+  // Gérer le document sélectionné passé en prop
   useEffect(() => {
-    const fetchDocuments = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const docs = await listDocuments();
-        console.log("Documents récupérés:", JSON.stringify(docs, null, 2));
-        setDocuments(docs);
-      } catch (err) {
-        console.error("Erreur lors du chargement des documents:", err);
-        setError("Impossible de charger les documents");
-      } finally {
-        setLoading(false);
+    if (propSelectedDocument) {
+      // Chercher le document correspondant dans la liste
+      const matchingDoc = documents.find(doc => 
+        doc.id === propSelectedDocument.id || 
+        doc.title === propSelectedDocument.title
+      );
+      
+      if (matchingDoc) {
+        setSelectedDocument(matchingDoc);
+      } else {
+        // Si le document n'est pas trouvé dans la liste, créer un DocumentResponse à partir des données
+        const documentResponse: DocumentResponse = {
+          id: propSelectedDocument.id || '',
+          title: propSelectedDocument.title,
+          metadata: propSelectedDocument.metadata || {}
+        };
+        setSelectedDocument(documentResponse);
       }
-    };
-
-    fetchDocuments();
-  }, [refreshTrigger]);
+    }
+  }, [propSelectedDocument, documents]);
 
   // Gérer la suppression d'un document
   const handleDeleteDocument = async (id: string) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) {
       try {
         await deleteDocument(id);
-        setRefreshTrigger(prev => prev + 1);
+        refresh(); // Rafraîchir la liste après suppression
       } catch (err) {
         console.error("Erreur lors de la suppression du document:", err);
-        setError("Impossible de supprimer le document");
       }
     }
   };
@@ -51,12 +66,19 @@ export default function Documents() {
   // Gérer la fermeture du dialogue d'upload
   const handleCloseUploadDialog = () => {
     setUploadDialogOpen(false);
-    setRefreshTrigger(prev => prev + 1);
+    refresh(); // Rafraîchir la liste après upload
   };
 
   return (
     <Box sx={{ p: 3, maxWidth: "1200px", mx: "auto", width: "100%" }}>
       <DocumentHeader onAddClick={() => setUploadDialogOpen(true)} />
+
+      {/* Affichage du nombre total de documents */}
+      {total > 0 && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {documents.length} document{documents.length > 1 ? 's' : ''} sur {total}
+        </Typography>
+      )}
 
       <DocumentList
         documents={documents}
@@ -64,7 +86,23 @@ export default function Documents() {
         error={error}
         onDocumentClick={setSelectedDocument}
         onAddClick={() => setUploadDialogOpen(true)}
+        showSkeletons={isLoadingMore}
+        skeletonCount={6}
       />
+
+      {/* Bouton pour charger plus de documents */}
+      {hasMore && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Button
+            variant="outlined"
+            onClick={loadMore}
+            disabled={isLoadingMore}
+            startIcon={isLoadingMore ? <CircularProgress size={20} /> : null}
+          >
+            {isLoadingMore ? 'Chargement...' : 'Charger plus de documents'}
+          </Button>
+        </Box>
+      )}
 
       <DocumentViewer
         document={selectedDocument}
