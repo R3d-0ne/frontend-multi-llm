@@ -65,6 +65,52 @@ export const getDocumentImage = (doc: DocumentResponse): string | null => {
 };
 
 /**
+ * Récupère toutes les images/pages d'un document si disponibles
+ */
+export const getDocumentImages = (doc: DocumentResponse): string[] => {
+  const images: string[] = [];
+
+  if (!doc) return images;
+
+  // Image directe unique
+  if (doc.image) {
+    images.push(doc.image);
+  }
+
+  if (doc.metadata) {
+    // Cas 1: metadata est un tableau de pages { data: base64 }
+    if (Array.isArray(doc.metadata)) {
+      const pages = doc.metadata as any[];
+      pages.forEach(p => {
+        if (p && p.data) images.push(p.data);
+      });
+    }
+
+    // Cas 2: metadata possède des clés numériques indexées
+    const numericKeys = Object.keys(doc.metadata).filter(key => !isNaN(Number(key)));
+    if (numericKeys.length > 0) {
+      const md = doc.metadata as { [key: string]: any };
+      numericKeys
+        .sort((a, b) => Number(a) - Number(b))
+        .forEach(k => {
+          if (md[k] && md[k].data) images.push(md[k].data);
+        });
+    }
+
+    // Cas 3: metadata.images est un tableau
+    const mdObj = doc.metadata as { [key: string]: any };
+    if (mdObj.images && Array.isArray(mdObj.images)) {
+      mdObj.images.forEach((img: any) => {
+        if (img && img.data) images.push(img.data);
+      });
+    }
+  }
+
+  // Dédupliquer en conservant l'ordre
+  return images.filter((val, idx, arr) => arr.indexOf(val) === idx);
+};
+
+/**
  * Filtre les métadonnées pour supprimer les données volumineuses
  */
 export const filterMetadata = (metadata: any): any => {

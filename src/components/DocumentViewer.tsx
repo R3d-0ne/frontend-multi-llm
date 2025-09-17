@@ -1,10 +1,9 @@
-import { Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, IconButton, Button } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
+ 
 import { DocumentResponse } from "../types/document";
-import { getDocumentId, getDocumentImage, formatDate } from "../utils/documentUtils";
+import { getDocumentId, getDocumentImages, formatDate } from "../utils/documentUtils";
 import { MetadataTag, METADATA_COLORS } from "../types/metadata";
 import { extractMetadataTags, extractBestEntities } from "../utils/documentUtils";
-import { queryDocument } from "../services/document_query_service";
+ 
 
 interface DocumentViewerProps {
   document: DocumentResponse | null;
@@ -12,14 +11,14 @@ interface DocumentViewerProps {
   onDelete: (id: string) => void;
 }
 
-export default function DocumentViewer({ document: doc, onClose, onDelete }: DocumentViewerProps) {
+export default function DocumentViewer({ document: doc, onClose }: DocumentViewerProps) {
   if (!doc) return null;
 
-  const image = getDocumentImage(doc);
-  if (!image) return null;
+  const images = getDocumentImages(doc);
+  if (!images || images.length === 0) return null;
 
-  // Créer l'URL de l'image
-  const imageUrl = image.startsWith('data:') ? image : `data:image/png;base64,${image}`;
+  // Créer les URLs d'images (toutes les pages)
+  const imageUrls = images.map(img => (img.startsWith('data:') ? img : `data:image/png;base64,${img}`));
   
   // Extraire les métadonnées
   const tags = extractMetadataTags(doc);
@@ -707,8 +706,12 @@ export default function DocumentViewer({ document: doc, onClose, onDelete }: Doc
             </div>
           </div>
           
-          <div id="visualization-content" class="tab-content">
-            <img src="${imageUrl}" alt="${doc.title || 'Document'}" class="document-image" />
+          <div id="visualization-content" class="tab-content" style="flex-direction: column; align-items: stretch;">
+            ${imageUrls.map((url, idx) => `
+              <div style="display: flex; justify-content: center; padding: 8px 0;">
+                <img src="${url}" alt="${(doc.title || 'Document') + ' - page ' + (idx + 1)}" class="document-image" />
+              </div>
+            `).join('')}
           </div>
           
           <div id="search-content" class="tab-content hidden">

@@ -1,50 +1,56 @@
-# React + TypeScript + Vite
+# Frontend React + TypeScript (Vite) – UI de recherche et chat documentaire
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interface web pour rechercher des documents, les téléverser, interroger un document, gérer les discussions/messages, et générer des réponses contextuelles via le backend FastAPI.
 
-Currently, two official plugins are available:
+## Démarrage rapide
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node 20 recommandé
+- Installer: `npm install`
+- Dev server: `npm run dev` → `http://localhost:5173`
+- Avec Docker Compose: service `web` expose `5173`, backend accessible sur `http://localhost:8000`
 
-## Expanding the ESLint configuration
+## Structure et composants
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+- `src/components/` Chat, upload, liste et vue document, paramètres, sidebar.
+- `src/services/` appels HTTP vers le backend:
+  - `search_service.tsx`: `/search/`, `/search/simple`, `/search/internal/`, `/search/document-query/`
+  - `document_upload_service.tsx`: `POST /documents/`
+  - `document_service.tsx`: `GET/LIST/PATCH/DELETE /documents`
+  - `discussions_services.tsx`: CRUD `/discussions`
+  - `message_service.tsx`: CRUD `/messages`
+  - `context_services.tsx`: `POST/GET/DELETE /contexts`
+  - `history_services.tsx`: `POST /history/`, `GET /history/{discussion_id}`, `DELETE /history/{history_id}`
+  - `generate_services.tsx`: `POST /generate`, `GET /models`, `POST /models/select`
 
-- Configure the top-level `parserOptions` property like this:
+Toutes les URLs pointent par défaut sur `http://localhost:8000` via `API_BASE_URL` défini en haut de chaque service.
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+## Fonctionnalités UI
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+- Recherche avancée: filtres (tables, entités, dates, etc.), rerank LLM, réponse optionnelle.
+- Recherche simple: champ `q`, résultats rapides.
+- Interrogation d’un document par nom (QA ciblée).
+- Upload de documents avec pipeline de traitement et enrichissement LLM optionnel.
+- Gestion des discussions, messages, contextes et historique.
+- Sélection du modèle LLM côté UI via `/models` et `/models/select`.
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+## Configuration
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+- Le backend doit être accessible sur `http://localhost:8000`. Si vous servez ailleurs (proxy, Docker distant), adaptez `API_BASE_URL` dans les fichiers de `src/services/`.
+- ESLint/TS déjà configurés (voir `eslint.config.js`, `tsconfig*.json`).
+
+## Scripts NPM
+
+- `npm run dev`: lance Vite en mode dev (HMR)
+- `npm run build`: build de production
+- `npm run preview`: prévisualisation du build
+- `npm run lint`: lint du projet
+
+## Docker
+
+- Dockerfile basé sur `node:18`, expose `5173` et lance Vite (`--host`).
+- En Compose, le volume monte le dossier pour HMR, et un volume anonyme est utilisé pour `node_modules`.
+
+## Dépendances clés
+
+- React 19, React Router 7, Material UI v6, Axios, Dropzone, Syntax Highlighter.
+
